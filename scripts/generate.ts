@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import OpenAI from "openai";
+import { randomInt } from "crypto";
 import { join } from "path";
 import { writeFile, mkdir, readFile, readdir } from "fs/promises";
 import matter from "gray-matter";
@@ -237,13 +238,23 @@ function pickModel(): string {
   const raw = process.env.OPENAI_MODEL || "gpt-4o";
   const models = raw.split(",").map((m) => m.trim()).filter(Boolean);
   if (models.length === 0) return "gpt-4o";
-  return models[Math.floor(Math.random() * models.length)]!;
+  return models[randomInt(models.length)]!;
 }
 
 /** Roughly 50/50 random choice between English and Simplified Chinese. */
 function pickLanguage(): Lang {
-  const r = Math.random();
-  return r < 0.5 ? "en" : "zh";
+  return randomInt(2) === 0 ? "en" : "zh";
+}
+
+/**
+ * Detect language from a user-supplied topic string.
+ * Returns "zh" or "en" if a clear signal is found, otherwise null (→ random).
+ */
+function detectLanguage(topic: string): Lang | null {
+  if (/\bin\s+chinese\b|\bin\s+simplified\s+chinese\b|用简体中文|用中文|中文写|写中文/i.test(topic)) return "zh";
+  if (/\bin\s+english\b|用英文|用英语/i.test(topic)) return "en";
+  if (/[\u4e00-\u9fff]/.test(topic)) return "zh";
+  return null;
 }
 
 function extractMarkdown(raw: string): string {
@@ -261,7 +272,7 @@ function extractMarkdown(raw: string): string {
 async function main(): Promise<void> {
   const model = pickModel();
   const topic = process.argv.slice(2).join(" ").trim() || undefined;
-  const lang = pickLanguage();
+  const lang = (topic ? detectLanguage(topic) : null) ?? pickLanguage();
   const tagContext = await buildTagContext();
 
   const openai = new OpenAI({ apiKey, baseURL });
