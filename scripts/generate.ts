@@ -160,19 +160,21 @@ function getSystemPrompt(modelName: string, tagContext: string, lang: Lang): str
 
 **Style (mandatory):**
 - Formal academic tone. The topic may be speculative or unusual; treat it with full seriousness. Deadpan.
-- Very long. Very low information density. Use sidenotes and marginnotes heavily:
-  - [^ Inline sidenote text here.]
-  - [note: Inline marginnote text here.]
+- Very long. Very low information density. Use sidenotes and marginnotes heavily.
+- Sidenote/marginnote placement rules (STRICT):
+  - ALWAYS embed them mid-sentence or at the end of a sentence, as part of a paragraph. Example: "The phenomenon [^ This is a sidenote anchored inside the sentence.] was first observed in 1987."
+  - NEVER place a [^ ...] or [note: ...] on its own line, as a standalone block, or as the only content of a paragraph. A note that is not attached to surrounding prose is forbidden.
+  - Syntax: [^ sidenote text here.] for numbered sidenotes; [note: marginnote text here.] for unnumbered margin notes.
 - Embrace wildly speculative, cross-domain, almost impossible mechanisms and analogies. Prioritize surprising, strange connections over realism, while keeping the formal research tone.
 ${languageInstruction}
 - Never say that this is parody, satire, or "for fun." Never use tags like #AI, #parody, #satire, #humor in frontmatter or body. Use only substantive topic tags in the tags array (e.g. systems, methodology, biology).
 
-**Tags (mandatory):**
+**Tags (strict):**
 - Use lowercase kebab-case tags.
-- Prefer tags from the existing vocabulary below, but ONLY when they are clearly, directly related to the actual content of this specific article. If a suggested tag or cluster does not fit the content, do NOT use it.
-- You may introduce up to 2 new tags if absolutely necessary, but keep them consistent with the existing style and obviously grounded in the article's topic and methods.
-- Aim for 3–8 tags total. Every tag must be something that an informed human reader would immediately agree is relevant after reading the paper.
-- Avoid meta tags like "parody", "satire", "humor" (even if they exist in the archive). 
+- A tag is only valid if an informed reader who has just finished reading the full article would IMMEDIATELY and UNAMBIGUOUSLY agree it describes a central theme or method of THIS specific article. If there is any doubt, omit the tag.
+- Do NOT add tags just to reach a count. It is better to have 2 highly relevant tags than 6 weakly-related ones. An empty tags array is preferable to a padded one.
+- You may introduce up to 2 new tags if the article's core topic genuinely has no match in the existing vocabulary.
+- Never use tags like "parody", "satire", "humor", or "ai" regardless of whether they appear in the archive. 
 
 ${tagContext}
 
@@ -200,7 +202,7 @@ function buildUserPrompt(topic: string | undefined, lang: Lang): string {
   if (topic && topic.trim()) {
     return `Generate a full research article (frontmatter + body) on this topic: "${topic.trim()}"
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire in tags. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...] embedded inline within sentences (NEVER on their own line). Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire in tags; prefer fewer precise tags over many vague ones. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
   }
   return `Generate a full research article (frontmatter + body) on a speculative or interdisciplinary topic. Examples of the kind of topic we want:
 - Distributed systems and the spatial distribution of gastric fluid / microbiota in the human stomach
@@ -221,7 +223,7 @@ Pick one of these or invent something in the same spirit.
 
 Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic centered on food, cooking, instant noodles/ramen, or culinary optimization.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire in tags; use only topic tags. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...] embedded inline within sentences (NEVER on their own line). Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire in tags; prefer 2–4 highly precise tags over a padded list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
 }
 
 function slugify(title: string): string {
