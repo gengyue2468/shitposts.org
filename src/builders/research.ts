@@ -362,6 +362,7 @@ export async function buildResearchIndex(
       config.site.ogImageAlt
     ),
     jsonLd: generateResearchIndexJsonLd(researchBasePathTitle, config.site.description, researchBasePathUrl, posts.length),
+    htmlLang: "en",
   };
   const output = renderTemplate(baseLayout, baseData);
   const outputPath = join(config.dirs.dist, researchDistSegment, "index.html");
@@ -431,6 +432,7 @@ export async function buildResearchPosts(
     const ogImageBase = config.site.ogImage
       ? (config.cdn || config.site.url).replace(/\/$/, "") + config.site.ogImage
       : undefined;
+    const htmlLang = (frontmatter.lang as string) || "en";
     const baseData = {
       title: fullTitle,
       siteTitle: config.site.title,
@@ -456,6 +458,7 @@ export async function buildResearchPosts(
         config.site.ogImageAlt
       ),
       jsonLd: generateJsonLd(title, description, postUrl, frontmatter.date as string, postTags),
+      htmlLang,
     };
     const output = renderTemplate(baseLayout, baseData);
     const outputPath = join(config.dirs.dist, researchDistSegment, post.slug, "index.html");

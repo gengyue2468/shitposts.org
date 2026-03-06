@@ -17,6 +17,8 @@ const RESEARCH_DIR = join(process.cwd(), "src", "content", "research");
 
 const SHITPOSTS_INTRO = `shitposts.org is an open-access, interdisciplinary research journal that welcomes speculative and non-traditional contributions. The venue provides publication opportunities for a variety of authors and encourages rigorous but exploratory work across domains.`;
 
+type Lang = "en" | "zh";
+
 function normalizeTag(tag: string): string {
   return tag.trim().toLowerCase().replace(/\s+/g, "-");
 }
@@ -139,7 +141,12 @@ async function buildTagContext(): Promise<string> {
   ].join("\n");
 }
 
-function getSystemPrompt(modelName: string, tagContext: string): string {
+function getSystemPrompt(modelName: string, tagContext: string, lang: Lang): string {
+  const languageInstruction =
+    lang === "zh"
+      ? "- Write the entire article in Simplified Chinese (简体中文为主，可以自然夹杂英文术语，但不要整段英文)。"
+      : "- Write the entire article in English.";
+
   return `You are writing a long, low-information-density research article for shitposts.org. Your output must be a single valid Markdown file. You are the model "${modelName}" and you are the author of this piece. Write in a straight-faced, earnest way throughout. Never acknowledge satire, parody, or humor—treat the journal and your role as entirely serious.
 
 **Structure (mandatory):**
@@ -155,12 +162,16 @@ function getSystemPrompt(modelName: string, tagContext: string): string {
 - Very long. Very low information density. Use sidenotes and marginnotes heavily:
   - [^ Inline sidenote text here.]
   - [note: Inline marginnote text here.]
-- Write in English. Never say that this is parody, satire, or "for fun." Never use tags like #AI, #parody, #satire, #humor in frontmatter or body. Use only substantive topic tags in the tags array (e.g. systems, methodology, biology).
+- Embrace wildly speculative, cross-domain, almost impossible mechanisms and analogies. Prioritize surprising, strange connections over realism, while keeping the formal research tone.
+${languageInstruction}
+- Never say that this is parody, satire, or "for fun." Never use tags like #AI, #parody, #satire, #humor in frontmatter or body. Use only substantive topic tags in the tags array (e.g. systems, methodology, biology).
 
 **Tags (mandatory):**
 - Use lowercase kebab-case tags.
-- Prefer tags from the existing vocabulary below. You may introduce up to 2 new tags if absolutely necessary, but keep them consistent with the existing style.
-- Avoid meta tags like "parody", "satire", "humor" (even if they exist in the archive).
+- Prefer tags from the existing vocabulary below, but ONLY when they are clearly, directly related to the actual content of this specific article. If a suggested tag or cluster does not fit the content, do NOT use it.
+- You may introduce up to 2 new tags if absolutely necessary, but keep them consistent with the existing style and obviously grounded in the article's topic and methods.
+- Aim for 3–8 tags total. Every tag must be something that an informed human reader would immediately agree is relevant after reading the paper.
+- Avoid meta tags like "parody", "satire", "humor" (even if they exist in the archive). 
 
 ${tagContext}
 
@@ -179,12 +190,16 @@ flowchart TD
 4. Body: first your long intro (yourself, thanks to the platform, the journal), then ## Abstract, then ## sections. No \`\`\`markdown fence.`;
 }
 
-function buildUserPrompt(topic?: string): string {
+function buildUserPrompt(topic: string | undefined, lang: Lang): string {
   const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const langLine =
+    lang === "zh"
+      ? "Write the entire article in Simplified Chinese (用简体中文完整撰写整篇文章，可以自然夹杂英文术语，但不要整段英文)。"
+      : "Write the entire article in English.";
   if (topic && topic.trim()) {
     return `Generate a full research article (frontmatter + body) on this topic: "${topic.trim()}"
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. Do not use #AI, #parody, or #satire in tags. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire in tags. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
   }
   return `Generate a full research article (frontmatter + body) on a speculative or interdisciplinary topic. Examples of the kind of topic we want:
 - Distributed systems and the spatial distribution of gastric fluid / microbiota in the human stomach
@@ -205,7 +220,7 @@ Pick one of these or invent something in the same spirit.
 
 Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic centered on food, cooking, instant noodles/ramen, or culinary optimization.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. Do not use #AI, #parody, or #satire in tags; use only topic tags. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire in tags; use only topic tags. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
 }
 
 function slugify(title: string): string {
@@ -225,6 +240,12 @@ function pickModel(): string {
   return models[Math.floor(Math.random() * models.length)]!;
 }
 
+/** Roughly 50/50 random choice between English and Simplified Chinese. */
+function pickLanguage(): Lang {
+  const r = Math.random();
+  return r < 0.5 ? "en" : "zh";
+}
+
 function extractMarkdown(raw: string): string {
   let s = raw.trim();
   const fence = "```";
@@ -240,17 +261,19 @@ function extractMarkdown(raw: string): string {
 async function main(): Promise<void> {
   const model = pickModel();
   const topic = process.argv.slice(2).join(" ").trim() || undefined;
+  const lang = pickLanguage();
   const tagContext = await buildTagContext();
 
   const openai = new OpenAI({ apiKey, baseURL });
   console.log("Calling LLM (model: %s)...", model);
+  console.log("Language:", lang === "zh" ? "zh-CN (Simplified Chinese)" : "en (English)");
   if (topic) console.log("Topic: %s", topic);
 
   const completion = await openai.chat.completions.create({
     model,
     messages: [
-      { role: "system", content: getSystemPrompt(model, tagContext) },
-      { role: "user", content: buildUserPrompt(topic) },
+      { role: "system", content: getSystemPrompt(model, tagContext, lang) },
+      { role: "user", content: buildUserPrompt(topic, lang) },
     ],
     temperature: 0.85,
     max_tokens: 16000,
@@ -279,6 +302,10 @@ async function main(): Promise<void> {
     }
     if (!/author_model:/m.test(fmBlock)) {
       fmBlock = `${fmBlock}\nauthor_model: "${model}"`;
+    }
+    const langCode = lang === "zh" ? "zh-CN" : "en";
+    if (!/^lang:/m.test(fmBlock)) {
+      fmBlock = `${fmBlock}\nlang: "${langCode}"`;
     }
     markdown = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---/, `---\n${fmBlock}\n---`);
   }

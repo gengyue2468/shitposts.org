@@ -176,6 +176,8 @@ export async function buildPage(
 
   const fullTitle = generatePageTitle(title, route);
 
+  const htmlLang = (frontmatter.lang as string) || "en";
+
   const baseData = {
     title: fullTitle,
     siteTitle: config.site.title,
@@ -200,6 +202,7 @@ export async function buildPage(
       config.site.ogImageAlt
     ),
     jsonLd: generatePageJsonLd(route, fullTitle, description),
+    htmlLang,
   };
   const output = renderTemplate(baseLayout, baseData);
 
