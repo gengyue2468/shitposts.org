@@ -1,0 +1,71 @@
+name: Generate research article
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Optional topic for this research (leave empty for random speculative topic)"
+        required: false
+        type: string
+  schedule:
+    - cron: "0 */8 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "latest"
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate research article
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_MODEL_INTRO: ${{ secrets.OPENAI_MODEL_INTRO }}
+        run: |
+          if [ -n "${{ github.event.inputs.topic }}" ]; then
+            bun run scripts/generate.ts "${{ github.event.inputs.topic }}"
+          else
+            bun run scripts/generate.ts
+          fi
+
+      - name: Build site (optional sanity check)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_MODEL_INTRO: ${{ secrets.OPENAI_MODEL_INTRO }}
+        run: bun run src/index.ts
+
+      - name: Commit and push generated content
+        if: ${{ success() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "shitposts-bot"
+          git config user.email "shitposts-bot@users.noreply.github.com"
+
+          git add src/content/research
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          git commit -m "chore: add generated research (${ts})"
+          git push
+

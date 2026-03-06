@@ -1,0 +1,127 @@
+<!--
+==============================================================================
+|
+|        +=============================================================+
+|        |                                                             |
+|        |                    S H I T P O S T S . O R G                |
+|        |                                                             |
+|        |              A Parody Research Journal                      |
+|        |     ( ISSN: N/A  |  Impact factor: ?  |  Peer review: no )  |
+|        |                                                             |
+|        +=============================================================+
+|
+| --------------------------------------------------------------------------
+| EDITORIAL NOTICE TO THE READER (VIEW SOURCE DIVISION)
+| --------------------------------------------------------------------------
+|
+| You are now reading the HTML comment block that appears at the top of the
+| base layout template for shitposts.org. This block exists for no reason
+| other than to be discovered by curious persons who inspect the source of
+| our pages. We have chosen to make it long. We have chosen to make it
+| verbose. We have chosen to explain things that do not require explanation.
+|
+| shitposts.org is a publication—we use the word "publication" loosely—that
+| hosts AI-generated or AI-assisted texts written in the style of academic
+| research. These texts are not research. They have not been peer-reviewed.
+| They have not been fact-checked. They have not been read by anyone who
+| could be described as an expert in the relevant field, in part because
+| the "relevant field" is often undefined or absurd. We publish them anyway.
+|
+| The present site is built from static HTML. The content you see is
+| generated at build time from Markdown and templates. There is no
+| server-side logic at request time. There are no cookies. There is no
+| analytics (by default). There is only this comment, and below it, the
+| structure of the document.
+|
+| Example research topics that have appeared or may appear in our pages
+| include, but are not limited to: the application of distributed systems
+| theory to the spatial distribution of microbiota in the human digestive
+| tract; gradient-based optimization methods for the preparation of instant
+| noodles; the quantum mechanical treatment of lost socks and their
+| entanglement with the laundry basket; medieval alchemy as a framework for
+| training neural networks; and other subjects of a similarly speculative or
+| nonsensical character. We do not guarantee the accuracy of any claim. We
+| do not guarantee the coherence of any argument. We guarantee only that
+| the text will look like it might have been written by someone who took
+| themselves seriously. The rest is vibes.
+|
+| Below this comment you will find the actual DOM: doctype, html, head,
+| body, nav, main, article, section, footer. We have kept the structure
+| simple. We have not kept this comment simple. We hope you have enjoyed
+| reading it, or at least have not been harmed by it. Proceed with caution,
+| or with abandon. We are not responsible for the consequences of either.
+|
+==============================================================================
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="author" content="{{author}}" />
+    <meta name="description" content="{{description}}" />
+    {{keywords}}
+    <title>{{title}}</title>
+    <link rel="canonical" href="{{canonicalUrl}}" />
+    {{ogTags}}
+    {{jsonLd}}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="/fonts/et-book-roman-line-figures.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/et-book-display-italic-old-style-figures.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/et-book-bold-line-figures.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    {{css}}
+  </head>
+  <body>
+    <nav>{{nav}}</nav>
+
+    <main>
+      <article>
+        <section>{{content}}</section>
+      </article>
+    </main>
+
+    <footer class="footer">
+      <p>
+        &copy; {{year}} {{author}}. <a href="/rss.xml">RSS</a> |
+        <a href="/sitemap.xml">Sitemap</a>{{footerLlms}}
+      </p>
+    </footer>
+
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [["$", "$"], ["\\(", "\\)"]],
+          displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+          processEscapes: true,
+        },
+        options: {
+          skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+        },
+      };
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
+    ></script>
+    {{scripts}}
+  </body>
+</html>

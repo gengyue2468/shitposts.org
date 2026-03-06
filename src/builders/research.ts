@@ -1,0 +1,536 @@
+import { join, dirname, extname, basename } from "path";
+import { readdir } from "fs/promises";
+import { ensureDir, writeFileContent } from "../utils/fs.js";
+import { renderMarkdown } from "../utils/markdown.js";
+import { renderTemplate, renderNav } from "../utils/template.js";
+import { formatDate } from "../utils/date.js";
+import { hasMermaidCode as checkMermaidCode, mermaidScript } from "../extensions/mermaid.js";
+import config from "../config.js";
+import type { Post } from "../types.js";
+
+const researchBasePath = config.blogBasePath ?? "/research";
+const researchDistSegment = researchBasePath.replace(/^\//, "");
+
+/** Author from post frontmatter (who actually wrote it) or fallback. */
+function getPostAuthor(frontmatter: Record<string, unknown>): string {
+  const model = (frontmatter.author_model as string) || (frontmatter.model as string);
+  if (model) return model;
+  return process.env.OPENAI_MODEL || config.site.author;
+}
+
+// Extended post with pre-rendered content
+interface PostWithContent extends Post {
+  html: string;
+  filePath: string;
+  frontmatter: Record<string, unknown>;
+}
+
+/**
+ * Truncate description to optimal length for SEO (150 chars)
+ */
+function truncateDescription(description: string, maxLength = 150): string {
+  if (description.length <= maxLength) return description;
+  const truncated = description.substring(0, maxLength);
+  const lastPeriod = truncated.lastIndexOf("。");
+  const lastSpace = truncated.lastIndexOf(" ");
+  const cutoff = lastPeriod > 0 ? lastPeriod + 1 : (lastSpace > 0 ? lastSpace : maxLength);
+  return truncated.substring(0, cutoff) + "...";
+}
+
+function generatePostTitle(postTitle: string, _tags?: string[]): string {
+  const siteName = config.site.title;
+  return `${postTitle} - ${siteName}`;
+}
+
+function generateKeywords(tags: string[] | undefined): string {
+  if (!tags || tags.length === 0) return "";
+  const keywords = tags.join(", ");
+  return `<meta name="keywords" content="${keywords}" />`;
+}
+
+function generateOgTags(
+  title: string,
+  description: string,
+  url: string,
+  type: string,
+  tags?: string[],
+  ogImageUrl?: string,
+  ogImageWidth?: number,
+  ogImageHeight?: number,
+  ogImageAlt?: string
+): string {
+  const parts: string[] = [
+    `<meta property="og:title" content="${title}" />`,
+    `<meta property="og:description" content="${truncateDescription(description)}" />`,
+    `<meta property="og:url" content="${url}" />`,
+    `<meta property="og:type" content="${type}" />`,
+    `<meta property="og:site_name" content="${config.site.title}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${title}" />`,
+    `<meta name="twitter:description" content="${truncateDescription(description)}" />`,
+  ];
+  if (ogImageUrl) {
+    parts.push(`<meta property="og:image" content="${ogImageUrl}" />`);
+    if (ogImageWidth) parts.push(`<meta property="og:image:width" content="${ogImageWidth}" />`);
+    if (ogImageHeight) parts.push(`<meta property="og:image:height" content="${ogImageHeight}" />`);
+    if (ogImageAlt) parts.push(`<meta property="og:image:alt" content="${ogImageAlt}" />`);
+    parts.push(`<meta name="twitter:image" content="${ogImageUrl}" />`);
+  }
+  if (tags && tags.length > 0) {
+    parts.push(`<meta name="twitter:label1" content="Tags" />`);
+    parts.push(`<meta name="twitter:data1" content="${tags.slice(0, 3).join(", ")}" />`);
+  }
+  return parts.join("\n    ");
+}
+
+function generateJsonLd(
+  title: string,
+  description: string,
+  url: string,
+  date: string | undefined,
+  tags: string[] | undefined
+): string {
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: title,
+    description: truncateDescription(description),
+    url: url,
+    author: { "@type": "Person", name: config.site.author },
+    publisher: { "@type": "Person", name: config.site.author },
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+  };
+  if (date) data.datePublished = new Date(date).toISOString();
+  if (tags && tags.length > 0) data.keywords = tags.join(", ");
+  return `<script type="application/ld+json">\n${JSON.stringify(data, null, 2)}\n</script>`;
+}
+
+function generateResearchIndexJsonLd(
+  title: string,
+  description: string,
+  url: string,
+  numberOfItems: number
+): string {
+  const baseUrl = config.site.url.replace(/\/$/, "");
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    url,
+    name: title,
+    description: truncateDescription(description),
+    numberOfItems,
+    isPartOf: { "@type": "WebSite", name: config.site.title, url: baseUrl + "/" },
+  };
+  return `<script type="application/ld+json">\n${JSON.stringify(data, null, 2)}\n</script>`;
+}
+
+function getTagSlug(tag: string): string {
+  return tag.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function generateTagsHTML(allTags: string[]): string {
+  const tagCounts: Record<string, number> = {};
+  for (const tag of allTags) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+  const sortedTags = [...new Set(allTags)].sort((a, b) => {
+    const countDiff = tagCounts[b]! - tagCounts[a]!;
+    return countDiff !== 0 ? countDiff : a.localeCompare(b);
+  });
+  const parts: string[] = ['<div class="tags-list">'];
+  for (const tag of sortedTags) {
+    const slug = getTagSlug(tag);
+    const count = tagCounts[tag]!;
+    const size = Math.min(3, Math.max(1, Math.ceil(count / 2)));
+    parts.push(`<a href="${researchBasePath}/tag/${slug}" class="tag tag-size-${size}" data-count="${count}">#${tag} <span class="tag-count">(${count})</span></a>`);
+  }
+  parts.push("</div>");
+  return parts.join("");
+}
+
+function generatePostTagsHTML(tags: string[] | undefined): string {
+  if (!tags || tags.length === 0) return "";
+  const parts: string[] = ['<div class="post-tags" style="margin-top: 2rem; margin-bottom: 1rem;">'];
+  for (const tag of tags) {
+    const slug = getTagSlug(tag);
+    parts.push(`<a href="${researchBasePath}/tag/${slug}" class="tag">#${tag}</a>`);
+  }
+  parts.push("</div>");
+  return parts.join("");
+}
+
+function getDateKey(dateString: string | undefined): string {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function generatePostsListHTML(posts: Post[]): string {
+  if (posts.length === 0) return "<p>No research found.</p>";
+
+  const postsByDate: Record<string, Post[]> = {};
+  for (const post of posts) {
+    const key = getDateKey(post.date);
+    const groupKey = key || "unknown";
+    if (!postsByDate[groupKey]) postsByDate[groupKey] = [];
+    postsByDate[groupKey]!.push(post);
+  }
+
+  const dateKeys = Object.keys(postsByDate).sort((a, b) => {
+    if (a === "unknown") return 1;
+    if (b === "unknown") return -1;
+    return b.localeCompare(a);
+  });
+
+  const parts: string[] = [];
+  for (const key of dateKeys) {
+    const datePosts = postsByDate[key]!;
+    if (key !== "unknown") {
+      parts.push(`<h3>${key}</h3>`);
+    } else {
+      parts.push("<h3>Unknown date</h3>");
+    }
+    parts.push('<ul class="posts-list">');
+    for (const post of datePosts) {
+      parts.push(`<li class="post-item">`);
+      parts.push(`<a href="${researchBasePath}/${post.slug}">${post.title}</a>`);
+      if (post.date) parts.push(` <span class="post-date-inline">${formatDate(post.date)}</span>`);
+      parts.push("</li>");
+    }
+    parts.push("</ul>");
+  }
+  return parts.join("");
+}
+
+export async function buildResearchIndex(
+  baseLayout: string,
+  researchIndexLayout: string,
+  year?: number,
+  css?: string
+): Promise<PostWithContent[]> {
+  const researchDir = config.dirs.research;
+  const posts: PostWithContent[] = [];
+  try {
+    const files = await readdir(researchDir);
+    const mdFiles = files.filter((file) => extname(file) === ".md");
+    const postPromises = mdFiles.map(async (file) => {
+      const filePath = join(researchDir, file);
+      const { frontmatter, html } = await renderMarkdown(filePath);
+      const slug = basename(file, ".md");
+      return {
+        slug,
+        title: (frontmatter.title as string) || slug,
+        date: (frontmatter.date as string) || "",
+        excerpt: (frontmatter.excerpt as string) || "",
+        summary: (frontmatter.summary as string) || "",
+        tags: (frontmatter.tags as string[]) || [],
+        html,
+        filePath,
+        frontmatter,
+      };
+    });
+    const results = await Promise.all(postPromises);
+    posts.push(...results);
+  } catch {
+    // Research directory doesn't exist
+  }
+  posts.sort((a, b) => {
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+  const allTags: string[] = [];
+  for (const post of posts) {
+    if (post.tags && Array.isArray(post.tags)) allTags.push(...post.tags);
+  }
+  const tagsHtml = generateTagsHTML(allTags);
+  const postsListHtml = posts.length > 0 ? generatePostsListHTML(posts) : "<p>No research yet.</p>";
+  const tagsSection = `<div style="margin-top: 3rem;">${tagsHtml}</div>`;
+  const contentData = { title: "Research", postsList: postsListHtml + tagsSection };
+  const renderedContent = renderTemplate(researchIndexLayout, contentData);
+  const researchBasePathUrl = `${config.site.url}${researchBasePath}`;
+  const researchBasePathTitle = `Research - ${config.site.title}`;
+  const ogImageBase = config.site.ogImage
+    ? (config.cdn || config.site.url).replace(/\/$/, "") + config.site.ogImage
+    : undefined;
+  const baseData = {
+    title: researchBasePathTitle,
+    siteTitle: config.site.title,
+    description: truncateDescription(config.site.description),
+    author: config.site.author,
+    year: year?.toString() || new Date().getFullYear().toString(),
+    content: renderedContent,
+    css: css || "",
+    nav: renderNav(config.nav),
+    scripts: "",
+    footerLlms: config.llms?.enabled ? ' | <a href="/llms.txt">llms.txt</a>' : "",
+    canonicalUrl: researchBasePathUrl,
+    keywords: "",
+    ogTags: generateOgTags(
+      researchBasePathTitle,
+      config.site.description,
+      researchBasePathUrl,
+      "website",
+      undefined,
+      ogImageBase,
+      config.site.ogImageWidth,
+      config.site.ogImageHeight,
+      config.site.ogImageAlt
+    ),
+    jsonLd: generateResearchIndexJsonLd(researchBasePathTitle, config.site.description, researchBasePathUrl, posts.length),
+  };
+  const output = renderTemplate(baseLayout, baseData);
+  const outputPath = join(config.dirs.dist, researchDistSegment, "index.html");
+  await ensureDir(dirname(outputPath));
+  await writeFileContent(outputPath, output);
+  console.log(`✓ Built ${researchBasePath} -> ${outputPath}`);
+  return posts;
+}
+
+export async function buildResearchPosts(
+  posts: PostWithContent[],
+  baseLayout: string,
+  researchPostLayout: string,
+  year?: number,
+  css?: string
+): Promise<void> {
+  const buildPromises = posts.map(async (post, i) => {
+    const { html, frontmatter } = post;
+    const title = (frontmatter.title as string) || post.slug;
+    const formattedDate = formatDate(frontmatter.date as string);
+    const prevPost = i > 0 ? posts[i - 1]! : null;
+    const nextPost = i < posts.length - 1 ? posts[i + 1]! : null;
+    let navHtml = "";
+    if (prevPost || nextPost) {
+      const navParts: string[] = [`<nav class="post-nav">`];
+      if (prevPost) navParts.push(`<a href="${researchBasePath}/${prevPost.slug}">← ${prevPost.title}</a>`);
+      if (nextPost) navParts.push(`<a href="${researchBasePath}/${nextPost.slug}">${nextPost.title} →</a>`);
+      navParts.push("</nav>");
+      navHtml = navParts.join("");
+    }
+    const postTagsHtml = generatePostTagsHTML(frontmatter.tags as string[]);
+    const dateClass = formattedDate ? "" : " hidden";
+    const plainText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const wordCountNum = plainText ? plainText.split(/\s+/).length : 0;
+    const wordCountDisplay = `${wordCountNum.toLocaleString()} words`;
+    const sourceMdLink = config.llms?.enabled
+      ? `<a href="${researchBasePath}/${post.slug}.md" class="md-link">.md</a>`
+      : "";
+    const datePart = formattedDate
+      ? ` · <span class="post-date${dateClass}">${formattedDate}</span>`
+      : "";
+    const authorName = getPostAuthor(frontmatter);
+    const authorIntro =
+      process.env.OPENAI_MODEL_INTRO ||
+      `Generated by ${authorName} for shitposts.org. Not peer-reviewed.`;
+    const contentData = {
+      title,
+      date: formattedDate,
+      dateClass,
+      dateSeparator: formattedDate ? " · " : "",
+      wordCountDisplay,
+      datePart,
+      authorName,
+      authorIntro,
+      content: html,
+      tags: postTagsHtml,
+      navigation: navHtml,
+      sourceMdLink,
+    };
+    const renderedContent = renderTemplate(researchPostLayout, contentData);
+    const description = (frontmatter.summary as string) || config.site.description;
+    const hasMermaid = html.includes('class="mermaid"') || checkMermaidCode(html);
+    const scripts = hasMermaid ? mermaidScript : "";
+    const postUrl = `${config.site.url}${researchBasePath}/${post.slug}`;
+    const postTags = frontmatter.tags as string[] | undefined;
+    const fullTitle = generatePostTitle(title, postTags);
+    const ogImageBase = config.site.ogImage
+      ? (config.cdn || config.site.url).replace(/\/$/, "") + config.site.ogImage
+      : undefined;
+    const baseData = {
+      title: fullTitle,
+      siteTitle: config.site.title,
+      description: truncateDescription(description),
+      author: config.site.author,
+      year: year?.toString() || new Date().getFullYear().toString(),
+      content: renderedContent,
+      css: css || "",
+      nav: renderNav(config.nav),
+      scripts,
+      footerLlms: config.llms?.enabled ? ' | <a href="/llms.txt">llms.txt</a>' : "",
+      canonicalUrl: postUrl,
+      keywords: generateKeywords(postTags),
+      ogTags: generateOgTags(
+        fullTitle,
+        description,
+        postUrl,
+        "article",
+        postTags,
+        ogImageBase,
+        config.site.ogImageWidth,
+        config.site.ogImageHeight,
+        config.site.ogImageAlt
+      ),
+      jsonLd: generateJsonLd(title, description, postUrl, frontmatter.date as string, postTags),
+    };
+    const output = renderTemplate(baseLayout, baseData);
+    const outputPath = join(config.dirs.dist, researchDistSegment, post.slug, "index.html");
+    await ensureDir(dirname(outputPath));
+    await writeFileContent(outputPath, output);
+    console.log(`✓ Built ${researchBasePath}/${post.slug}`);
+  });
+  await Promise.all(buildPromises);
+}
+
+export async function buildTagPages(
+  posts: PostWithContent[],
+  baseLayout: string,
+  tagsLayout: string,
+  year?: number,
+  css?: string
+): Promise<void> {
+  const tagMap = new Map<string, Post[]>();
+  for (const post of posts) {
+    if (post.tags && Array.isArray(post.tags)) {
+      for (const tag of post.tags) {
+        const existing = tagMap.get(tag) || [];
+        existing.push(post);
+        tagMap.set(tag, existing);
+      }
+    }
+  }
+  if (tagMap.size === 0) return;
+  const tagPromises: Promise<void>[] = [];
+  for (const [tag, taggedPosts] of tagMap) {
+    const promise = (async () => {
+      const slug = getTagSlug(tag);
+      taggedPosts.sort((a, b) => {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+      const allTags: string[] = [];
+      for (const post of posts) {
+        if (post.tags && Array.isArray(post.tags)) allTags.push(...post.tags);
+      }
+      const tagNavHtml = generateTagsHTML(allTags);
+      const postsListHtml = generatePostsListHTML(taggedPosts);
+      const contentData = { title: `Tag: #${tag}`, tagsList: tagNavHtml, postsList: postsListHtml };
+      const renderedContent = renderTemplate(tagsLayout, contentData);
+      const tagUrl = `${config.site.url}${researchBasePath}/tag/${slug}`;
+      const tagDescription = `Posts tagged with "${tag}" - ${config.site.title}`;
+      const tagPageTitle = `#${tag} - ${config.site.title}`;
+      const ogImageBase = config.site.ogImage
+        ? (config.cdn || config.site.url).replace(/\/$/, "") + config.site.ogImage
+        : undefined;
+      const baseData = {
+        title: tagPageTitle,
+        siteTitle: config.site.title,
+        description: truncateDescription(tagDescription),
+        author: config.site.author,
+        year: year?.toString() || new Date().getFullYear().toString(),
+        content: renderedContent,
+        css: css || "",
+        nav: renderNav(config.nav),
+        scripts: "",
+        footerLlms: config.llms?.enabled ? ' | <a href="/llms.txt">llms.txt</a>' : "",
+        canonicalUrl: tagUrl,
+        keywords: generateKeywords([tag]),
+        ogTags: generateOgTags(
+          tagPageTitle,
+          tagDescription,
+          tagUrl,
+          "website",
+          [tag],
+          ogImageBase,
+          config.site.ogImageWidth,
+          config.site.ogImageHeight,
+          config.site.ogImageAlt
+        ),
+        jsonLd: "",
+      };
+      const output = renderTemplate(baseLayout, baseData);
+      const outputPath = join(config.dirs.dist, researchDistSegment, "tag", slug, "index.html");
+      await ensureDir(dirname(outputPath));
+      await writeFileContent(outputPath, output);
+      console.log(`✓ Built ${researchBasePath}/tag/${slug}`);
+    })();
+    tagPromises.push(promise);
+  }
+  await Promise.all(tagPromises);
+  await buildTagIndexPage(posts, baseLayout, tagsLayout, year, css);
+}
+
+async function buildTagIndexPage(
+  posts: PostWithContent[],
+  baseLayout: string,
+  tagsLayout: string,
+  year?: number,
+  css?: string
+): Promise<void> {
+  const allTags: string[] = [];
+  for (const post of posts) {
+    if (post.tags && Array.isArray(post.tags)) allTags.push(...post.tags);
+  }
+  if (allTags.length === 0) return;
+  const tagCounts: Record<string, number> = {};
+  for (const tag of allTags) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+  const sortedTags = [...new Set(allTags)].sort((a, b) => {
+    const countDiff = tagCounts[b]! - tagCounts[a]!;
+    return countDiff !== 0 ? countDiff : a.localeCompare(b);
+  });
+  const tagsListParts: string[] = ['<div class="tags-cloud">'];
+  for (const tag of sortedTags) {
+    const slug = getTagSlug(tag);
+    const count = tagCounts[tag]!;
+    const size = Math.min(3, Math.max(1, Math.ceil(count / 2)));
+    tagsListParts.push(`<a href="${researchBasePath}/tag/${slug}" class="tag tag-size-${size}" data-count="${count}">#${tag} <span class="tag-count">(${count})</span></a>`);
+  }
+  tagsListParts.push("</div>");
+  const tagsCloudHtml = tagsListParts.join("");
+  const contentData = {
+    title: "All Tags",
+    tagsList: "",
+    postsList: `<p>${sortedTags.length} tag(s), ${posts.length} research(es).</p>${tagsCloudHtml}`,
+  };
+  const renderedContent = renderTemplate(tagsLayout, contentData);
+  const tagsIndexUrl = `${config.site.url}${researchBasePath}/tag`;
+  const tagsIndexDescription = `All tags - ${config.site.title}`;
+  const tagsIndexTitle = `Tags - ${config.site.title}`;
+  const ogImageBase = config.site.ogImage
+    ? (config.cdn || config.site.url).replace(/\/$/, "") + config.site.ogImage
+    : undefined;
+  const baseData = {
+    title: tagsIndexTitle,
+    siteTitle: config.site.title,
+    description: truncateDescription(tagsIndexDescription),
+    author: config.site.author,
+    year: year?.toString() || new Date().getFullYear().toString(),
+    content: renderedContent,
+    css: css || "",
+    nav: renderNav(config.nav),
+    scripts: "",
+    footerLlms: config.llms?.enabled ? ' | <a href="/llms.txt">llms.txt</a>' : "",
+    canonicalUrl: tagsIndexUrl,
+    keywords: "",
+    ogTags: generateOgTags(
+      tagsIndexTitle,
+      tagsIndexDescription,
+      tagsIndexUrl,
+      "website",
+      undefined,
+      ogImageBase,
+      config.site.ogImageWidth,
+      config.site.ogImageHeight,
+      config.site.ogImageAlt
+    ),
+    jsonLd: "",
+  };
+  const output = renderTemplate(baseLayout, baseData);
+  const outputPath = join(config.dirs.dist, researchDistSegment, "tag", "index.html");
+  await ensureDir(dirname(outputPath));
+  await writeFileContent(outputPath, output);
+  console.log(`✓ Built ${researchBasePath}/tag -> ${outputPath}`);
+}
