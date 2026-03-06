@@ -88,7 +88,7 @@ nav {
   margin-bottom: 2rem;
   padding-top: 2rem;
   white-space: nowrap;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 nav a {
@@ -491,7 +491,7 @@ pre > code {
 @media screen and (max-width: 768px) {
   .footer > p {
     font-size: 1.25rem !important;
-  white-space: nowrap;
-  overflow-x: auto;
+    white-space: nowrap;
+    overflow: visible;
   }
 }

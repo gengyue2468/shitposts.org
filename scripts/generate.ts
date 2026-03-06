@@ -20,21 +20,22 @@ const SHITPOSTS_INTRO = `shitposts.org is an open-access, interdisciplinary rese
 
 type Lang = "en" | "zh";
 
-function normalizeTag(tag: string): string {
-  return tag.trim().toLowerCase().replace(/\s+/g, "-");
-}
-
-type TagCluster = { tags: string[]; score: number };
-
 async function buildTagContext(): Promise<string> {
+  const whitelist: string[] = config.research?.categoryWhitelist ?? [
+    "Tech", "Physics", "Life", "Earth", "People", "Math",
+    "Methods", "Ideas", "Society", "Culture", "Systems", "Health", "Arts",
+  ];
+
   let files: string[] = [];
   try {
     files = (await readdir(RESEARCH_DIR)).filter((f) => f.toLowerCase().endsWith(".md"));
   } catch {
-    return "Existing categories in the archive: (none found yet)\n";
+    // no posts yet — show all categories at 0
   }
 
-  const posts: string[][] = [];
+  const counts = new Map<string, number>(whitelist.map((c) => [c, 0]));
+  let totalPosts = 0;
+
   for (const f of files) {
     try {
       const content = await readFile(join(RESEARCH_DIR, f), "utf8");
@@ -44,102 +45,25 @@ async function buildTagContext(): Promise<string> {
         Array.isArray(raw)
           ? raw.map((t) => String(t).trim()).filter(Boolean)
           : [];
-      const unique = Array.from(new Set(tags));
-      if (unique.length) posts.push(unique);
+      const matched = tags.filter((t) => counts.has(t));
+      if (matched.length) {
+        totalPosts++;
+        for (const t of matched) counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
     } catch {
       // ignore bad files
     }
   }
 
-  if (posts.length === 0) return "Existing categories in the archive: (none found yet)\n";
-
-  const counts = new Map<string, number>();
-  for (const tags of posts) {
-    for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
-  }
-
-  const totalPosts = posts.length;
-  const globalThreshold = Math.max(2, Math.ceil(totalPosts * 0.6));
-  const globalTags = Array.from(counts.entries())
-    .filter(([, c]) => c >= globalThreshold)
-    .map(([t]) => t);
-  const globalSet = new Set(globalTags);
-
-  // Union-Find clustering on non-global tags via simple co-occurrence.
-  const parent = new Map<string, string>();
-  const find = (x: string): string => {
-    const p = parent.get(x);
-    if (!p) return x;
-    if (p === x) return x;
-    const r = find(p);
-    parent.set(x, r);
-    return r;
-  };
-  const union = (a: string, b: string) => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent.set(ra, rb);
-  };
-
-  for (const t of counts.keys()) {
-    if (!globalSet.has(t)) parent.set(t, t);
-  }
-
-  for (const tags of posts) {
-    const local = tags.filter((t) => !globalSet.has(t));
-    for (let i = 0; i < local.length; i++) {
-      for (let j = i + 1; j < local.length; j++) {
-        union(local[i]!, local[j]!);
-      }
-    }
-  }
-
-  const comps = new Map<string, string[]>();
-  for (const t of parent.keys()) {
-    const r = find(t);
-    const arr = comps.get(r);
-    if (arr) arr.push(t);
-    else comps.set(r, [t]);
-  }
-
-  const clusters: TagCluster[] = Array.from(comps.values())
-    .map((tags) => {
-      const unique = Array.from(new Set(tags));
-      const score = unique.reduce((s, t) => s + (counts.get(t) || 0), 0);
-      return { tags: unique, score };
-    })
-    .filter((c) => c.tags.length >= 2)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8)
-    .map((c) => ({
-      ...c,
-      tags: c.tags.sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0)),
-    }));
-
-  const topTags = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 30)
+  // Sort ascending by count so under-represented categories appear first
+  const rows = Array.from(counts.entries())
+    .sort((a, b) => a[1] - b[1])
     .map(([t, c]) => `${t}(${c})`)
     .join(", ");
 
-  const clusterLines =
-    clusters.length > 0
-      ? clusters
-          .map((c, i) => `- Cluster ${i + 1}: ${c.tags.slice(0, 10).join(", ")}`)
-          .join("\n")
-      : "- (not enough tag co-occurrence yet; use the vocabulary list)\n";
-
-  const globalLine =
-    globalTags.length > 0 ? globalTags.slice(0, 12).join(", ") : "(none)";
-
   return [
-    `Existing categories in the archive (from ${totalPosts} researches; counts in parentheses):`,
-    topTags || "(none)",
-    "",
-    "Very simple tag clustering (based on co-occurrence; global tags are excluded from clustering):",
-    clusterLines,
-    "",
-    `Global / bridging tags (appear in many posts): ${globalLine}`,
+    `Category usage across ${totalPosts} existing articles (counts in parentheses, sorted least-used first — prefer categories with lower counts):`,
+    rows,
     "",
   ].join("\n");
 }
@@ -162,13 +86,16 @@ function getSystemPrompt(modelName: string, tagContext: string, lang: Lang): str
 
 **Style (mandatory):**
 - Formal academic tone. The topic may be speculative or unusual; treat it with full seriousness. Deadpan.
-- Very long. Very low information density. Use sidenotes and marginnotes heavily:
-  - [^ Inline sidenote text here.]
-  - [note: Inline marginnote text here.]
+- Very long. Very low information density. Use sidenotes and marginnotes heavily, following **exactly** these forms:
+  - Inline sidenotes: \`[^\u0020Sidenote text here.]\` — one space after \`[^\`, then the full note content, all on one line, and then a single closing \`]\`.
+  - Inline marginnotes: \`[note:\u0020Marginnote text here.]\` — the literal prefix \`[note:\u0020\` followed by the full note content, then a single closing \`]\`.
+  - Do **not** use reference-style footnotes such as \`[^1]: ...\` or multi-line note definitions.
+  - Do **not** nest additional \`[\` or \`]\` characters inside a single note; keep each note self-contained and relatively short.
+  - Never emit empty notes like \`[^]\` or \`[note:]\`; every note must contain meaningful text.
 - Embrace wildly speculative, cross-domain, almost impossible mechanisms and analogies. Prioritize surprising, strange connections over realism, while keeping the formal research tone.
 - Push yourself toward even more \"天马行空\" (wildly imaginative) constructions than typical academic satire: cross as many conceptual boundaries as possible while remaining internally consistent.
 ${languageInstruction}
-- Never say that this is parody, satire, or "for fun." Never use tags like #AI, #parody, #satire, #humor in frontmatter or body.
+- Never say that this is parody, satire, or "for fun." Never include hashtags like #AI, #parody, #satire, #humor in frontmatter or body.
 
 **Categories (mandatory):**
 - Assign each article to 1–3 broad, journal-style sections. You MUST choose from the following fixed vocabulary only (Title Case, do NOT invent new category names):
@@ -203,9 +130,11 @@ function buildUserPrompt(topic: string | undefined, lang: Lang): string {
       ? "Write the entire article in Simplified Chinese (用简体中文完整撰写整篇文章，可以自然夹杂英文术语，但不要整段英文)。"
       : "Write the entire article in English.";
   if (topic && topic.trim()) {
-    return `Generate a full research article (frontmatter + body) on this topic: "${topic.trim()}"
+    return `Generate a full research article (frontmatter + body) whose subject matter is: "${topic.trim()}"
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any tag list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+The subject above is a thematic prompt, not a required title. You are free — and encouraged — to invent a more creative, specific, or academically styled title that captures the spirit of the theme. The title in the frontmatter should read like a real journal paper title, not a literal restatement of the prompt.
+
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
   }
   return `Generate a full research article (frontmatter + body) on a speculative or interdisciplinary topic. Examples of the kind of topic we want:
 - Distributed systems and the spatial distribution of gastric fluid / microbiota in the human stomach
@@ -228,7 +157,7 @@ Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic cen
 
 Additionally, aim for topics that naturally span at least two different categories from the whitelist (for example, Tech + People, Physics + Life, Math + Ideas), so that categories are used broadly over time.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any tag list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
 }
 
 function slugify(title: string): string {

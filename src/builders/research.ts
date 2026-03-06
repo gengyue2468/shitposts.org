@@ -199,7 +199,7 @@ function formatFancyDateTime(dateString: string | undefined): string {
   const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const weekday = weekdayNames[d.getUTCDay()]!;
 
-  return `<h3>${year}</h3><h4>${weekday}, ${month} ${day}${daySuffix}</h4>`;
+  return `<h3>${year}</h3><h3>${weekday}, ${month} ${day}${daySuffix}</h3>`;
 }
 
 function formatTimeOnly(dateString: string | undefined): string {
