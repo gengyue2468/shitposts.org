@@ -62,10 +62,19 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
-            exit 0
+          else
+            ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            git commit -m "chore: add generated research (${ts})"
+            git push
           fi
 
-          ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          git commit -m "chore: add generated research (${ts})"
-          git push
+      - name: Publish to Cloudflare Pages
+        if: ${{ success() }}
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: shitposts-org # 替换成你在 Cloudflare Pages 中的项目名
+          directory: dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 

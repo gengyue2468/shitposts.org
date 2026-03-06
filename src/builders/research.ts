@@ -157,6 +157,86 @@ function generatePostTagsHTML(tags: string[] | undefined): string {
   return parts.join("");
 }
 
+function formatFancyDateTime(dateString: string | undefined): string {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const year = d.getUTCFullYear();
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const month = monthNames[d.getUTCMonth()]!;
+
+  const day = d.getUTCDate();
+  const daySuffix = (() => {
+    if (day % 100 >= 11 && day % 100 <= 13) return "th";
+    switch (day % 10) {
+      case 1:
+        return "st";
+      case 2:
+        return "nd";
+      case 3:
+        return "rd";
+      default:
+        return "th";
+    }
+  })();
+
+  const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const weekday = weekdayNames[d.getUTCDay()]!;
+
+  // Multi-line, Tufte-friendly layout for /research index:
+  // 2026
+  // Friday, March 6th
+  return `${year}<br />${weekday}, ${month} ${day}${daySuffix}`;
+}
+
+function formatTimeOnly(dateString: string | undefined): string {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toISOString().slice(11, 19); // HH:MM:SS (UTC)
+  return `at ${time} UTC`;
+}
+
+function formatFullDateTime(dateString: string | undefined): string {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const year = d.getUTCFullYear();
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const month = monthNames[d.getUTCMonth()]!;
+  const day = d.getUTCDate();
+  const time = d.toISOString().slice(11, 19); // HH:MM:SS (UTC)
+  return `${month} ${day}, ${year} at ${time} UTC`;
+}
+
 function getDateKey(dateString: string | undefined): string {
   if (!dateString) return "";
   const d = new Date(dateString);
@@ -188,7 +268,8 @@ function generatePostsListHTML(posts: Post[]): string {
   for (const key of dateKeys) {
     const datePosts = postsByDate[key]!;
     if (key !== "unknown") {
-      parts.push(`<h3>${key}</h3>`);
+      const heading = formatFancyDateTime(datePosts[0]?.date);
+      parts.push(`<h3>${heading || key}</h3>`);
     } else {
       parts.push("<h3>Unknown date</h3>");
     }
@@ -196,7 +277,8 @@ function generatePostsListHTML(posts: Post[]): string {
     for (const post of datePosts) {
       parts.push(`<li class="post-item">`);
       parts.push(`<a href="${researchBasePath}/${post.slug}">${post.title}</a>`);
-      if (post.date) parts.push(` <span class="post-date-inline">${formatDate(post.date)}</span>`);
+      if (post.date)
+        parts.push(` <span class="post-date-inline">${formatTimeOnly(post.date)}</span>`);
       parts.push("</li>");
     }
     parts.push("</ul>");
@@ -299,7 +381,7 @@ export async function buildResearchPosts(
   const buildPromises = posts.map(async (post, i) => {
     const { html, frontmatter } = post;
     const title = (frontmatter.title as string) || post.slug;
-    const formattedDate = formatDate(frontmatter.date as string);
+    const formattedDate = formatFullDateTime(frontmatter.date as string);
     const prevPost = i > 0 ? posts[i - 1]! : null;
     const nextPost = i < posts.length - 1 ? posts[i + 1]! : null;
     let navHtml = "";
