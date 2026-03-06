@@ -74,7 +74,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: shitposts-org # 替换成你在 Cloudflare Pages 中的项目名
+          projectName: shitposts-org 
           directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
