@@ -8,7 +8,7 @@ on:
         required: false
         type: string
   schedule:
-    - cron: "0 */8 * * *"
+    - cron: "0 */4 * * *"
 
 permissions:
   contents: write
@@ -67,14 +67,4 @@ jobs:
             git commit -m "chore: add generated research (${ts})"
             git push
           fi
-
-      - name: Publish to Cloudflare Pages
-        if: ${{ success() }}
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: shitposts-org 
-          directory: dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
