@@ -22,8 +22,11 @@ type Lang = "en" | "zh";
 
 async function buildTagContext(): Promise<string> {
   const whitelist: string[] = config.research?.categoryWhitelist ?? [
-    "Tech", "Physics", "Life", "Earth", "People", "Math",
-    "Methods", "Ideas", "Society", "Culture", "Systems", "Health", "Arts",
+    "Tech", "Physics", "Life", "Earth", "Space", "Chemistry", "Engineering",
+    "Math", "Methods", "Systems", "Health", "Medicine",
+    "People", "Society", "Culture", "Arts", "History", "Language",
+    "Philosophy", "Psychology", "Economics", "Law", "Politics",
+    "Ideas", "Environment",
   ];
 
   let files: string[] = [];
