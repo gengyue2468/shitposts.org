@@ -25,6 +25,19 @@ interface PostWithContent extends Post {
   frontmatter: Record<string, unknown>;
 }
 
+/** Count words correctly for mixed CJK + Latin text.
+ * CJK characters each count as one word; remaining text is split on whitespace.
+ */
+function countWords(text: string): number {
+  const cjk = (text.match(/[\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff]/g) ?? []).length;
+  const latin = text
+    .replace(/[\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return cjk + latin;
+}
+
 /**
  * Truncate description to optimal length for SEO (150 chars)
  */
@@ -88,8 +101,10 @@ function generateJsonLd(
   description: string,
   url: string,
   date: string | undefined,
-  tags: string[] | undefined
+  tags: string[] | undefined,
+  extra?: { wordCount?: number; inLanguage?: string; articleSection?: string; ogImageUrl?: string }
 ): string {
+  const baseUrl = config.site.url.replace(/\/$/, "");
   const data: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -97,11 +112,28 @@ function generateJsonLd(
     description: truncateDescription(description),
     url: url,
     author: { "@type": "Person", name: config.site.author },
-    publisher: { "@type": "Person", name: config.site.author },
+    publisher: {
+      "@type": "Organization",
+      name: config.site.title,
+      url: baseUrl + "/",
+      ...(config.site.ogImage ? { logo: { "@type": "ImageObject", url: (config.cdn || config.site.url).replace(/\/$/, "") + config.site.ogImage } } : {}),
+    },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    isPartOf: { "@type": "WebSite", name: config.site.title, url: baseUrl + "/" },
   };
-  if (date) data.datePublished = new Date(date).toISOString();
-  if (tags && tags.length > 0) data.keywords = tags.join(", ");
+  if (date) {
+    const iso = new Date(date).toISOString();
+    data.datePublished = iso;
+    data.dateModified = iso;
+  }
+  if (tags && tags.length > 0) {
+    data.keywords = tags.join(", ");
+    data.articleSection = tags[0];
+  }
+  if (extra?.wordCount) data.wordCount = extra.wordCount;
+  if (extra?.inLanguage) data.inLanguage = extra.inLanguage;
+  if (extra?.articleSection) data.articleSection = extra.articleSection;
+  if (extra?.ogImageUrl) data.image = { "@type": "ImageObject", url: extra.ogImageUrl };
   return `<script type="application/ld+json">\n${JSON.stringify(data, null, 2)}\n</script>`;
 }
 
@@ -399,7 +431,7 @@ export async function buildResearchPosts(
     const postTagsHtml = generatePostTagsHTML(postCats);
     const dateClass = formattedDate ? "" : " hidden";
     const plainText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    const wordCountNum = plainText ? plainText.split(/\s+/).length : 0;
+    const wordCountNum = plainText ? countWords(plainText) : 0;
     const wordCountDisplay = `${wordCountNum.toLocaleString()} words`;
     const sourceMdLink = config.llms?.enabled
       ? `<a href="${researchBasePath}/${post.slug}.md" class="md-link">.md</a>`
@@ -459,7 +491,12 @@ export async function buildResearchPosts(
         config.site.ogImageHeight,
         config.site.ogImageAlt
       ),
-      jsonLd: generateJsonLd(title, description, postUrl, frontmatter.date as string, postCatsForMeta),
+      jsonLd: generateJsonLd(title, description, postUrl, frontmatter.date as string, postCatsForMeta, {
+        wordCount: wordCountNum,
+        inLanguage: htmlLang,
+        articleSection: postCatsForMeta?.[0],
+        ogImageUrl: ogImageBase,
+      }),
       htmlLang,
     };
     const output = renderTemplate(baseLayout, baseData);

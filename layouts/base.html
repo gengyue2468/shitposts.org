@@ -60,11 +60,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="author" content="{{author}}" />
     <meta name="description" content="{{description}}" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#fffff8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151515" media="(prefers-color-scheme: dark)" />
     {{keywords}}
     <title>{{title}}</title>
     <link rel="canonical" href="{{canonicalUrl}}" />
+    <link rel="alternate" type="application/rss+xml" title="{{siteTitle}}" href="/rss.xml" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     {{ogTags}}
     {{jsonLd}}
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link
       rel="preload"
