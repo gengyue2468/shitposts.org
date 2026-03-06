@@ -1,5 +1,5 @@
 import { join, dirname } from "path";
-import { stat, rm } from "fs/promises";
+import { stat, rm, readdir } from "fs/promises";
 import { ensureDir, loadLayout, copyPublicFiles, writeFileContent } from "./utils/fs.js";
 import { buildPage, getInlinedCss } from "./builders/page.js";
 import { buildResearchIndex, buildResearchPosts, buildTagPages } from "./builders/research.js";
@@ -107,6 +107,25 @@ async function build(): Promise<void> {
   timer.start("research-posts");
   await buildResearchPosts(posts, baseLayout, researchPostLayout, currentYear, inlinedCss);
   timer.end("research-posts");
+
+  // Remove stale post directories from dist that no longer have a source file
+  timer.start("cleanup-stale");
+  const researchDistDir = join(config.dirs.dist, researchDistSegment);
+  try {
+    const activeSlugs = new Set(posts.map((p) => p.slug));
+    const distEntries = await readdir(researchDistDir, { withFileTypes: true });
+    await Promise.all(
+      distEntries
+        .filter((e) => e.isDirectory() && e.name !== "categories" && !activeSlugs.has(e.name))
+        .map((e) => {
+          console.log(`🗑 Removing stale: ${researchBasePath}/${e.name}`);
+          return rm(join(researchDistDir, e.name), { recursive: true, force: true });
+        })
+    );
+  } catch {
+    // dist/research may not exist yet on first run
+  }
+  timer.end("cleanup-stale");
 
   // Build tag pages
   timer.start("tag-pages");
