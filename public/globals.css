@@ -335,7 +335,7 @@ pre > code {
   display: block;
 }
 
-/* Mermaid diagram styling - border on parent container, scroll inside */
+/* Mermaid diagram styling - constrained to body-text column by default */
 .mermaid {
   border: 1px solid var(--accent);
   border-radius: 4px;
@@ -344,8 +344,15 @@ pre > code {
   overflow-y: hidden;
   background: var(--bg-color);
   padding: 1.5rem;
-  width: 100% !important;
-  max-width: 100%;
+  width: var(--width-content);
+  max-width: var(--width-content);
+  box-sizing: border-box;
+}
+
+/* Opt-in full-width: wrap with :::fullwidth or add class manually */
+.mermaid.fullwidth {
+  width: var(--width-fullwidth);
+  max-width: var(--width-fullwidth);
 }
 
 .mermaid svg {
@@ -456,6 +463,16 @@ pre > code {
     max-width: 100%;
     margin-left: 0;
     margin-right: 0;
+    padding-left: var(--width-padding-left-mobile);
+    padding-right: var(--width-padding-left-mobile);
+    border-radius: 0;
+    box-sizing: border-box;
+  }
+
+  .mermaid,
+  .mermaid.fullwidth {
+    width: 100%;
+    max-width: 100%;
     padding-left: var(--width-padding-left-mobile);
     padding-right: var(--width-padding-left-mobile);
     border-radius: 0;

@@ -110,6 +110,7 @@ async function build(): Promise<void> {
 
   // Remove stale post directories from dist that no longer have a source file
   timer.start("cleanup-stale");
+  const researchDistSegment = (config.blogBasePath ?? "/research").replace(/^\//, "");
   const researchDistDir = join(config.dirs.dist, researchDistSegment);
   try {
     const activeSlugs = new Set(posts.map((p) => p.slug));
