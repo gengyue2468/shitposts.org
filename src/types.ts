@@ -43,11 +43,18 @@ export interface NavItem {
   show: boolean;
 }
 
+/** Journal-style category whitelist (Title Case). Used for research frontmatter and prompts. */
+export interface ResearchConfig {
+  categoryWhitelist: string[];
+}
+
 export interface Config {
   site: SiteConfig;
   dirs: DirsConfig;
   /** Base URL path for the article list and individual posts (e.g. "/papers"). Default "/blog" when unset. */
   blogBasePath?: string;
+  /** Research / categories config. */
+  research?: ResearchConfig;
   routes: Record<string, string>;
   date: DateConfig;
   styles: StylesConfig;
@@ -94,7 +101,10 @@ export interface FrontMatter {
   date?: string;
   excerpt?: string;
   summary?: string;
+  /** @deprecated Use categories (whitelist) instead. */
   tags?: string[];
+  /** Research categories from config.research.categoryWhitelist (Title Case). */
+  categories?: string[];
   lang?: string;
   [key: string]: unknown;
 }

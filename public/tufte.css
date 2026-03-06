@@ -166,6 +166,7 @@ blockquote footer {
   text-align: right;
 }
 
+section > h2,
 section > p,
 section > footer,
 section > table {
@@ -484,6 +485,7 @@ label.margin-toggle:not(.sidenote-number) {
   }
 
   hr,
+  section > h2,
   section > p,
   section > footer,
   section > table {

@@ -1,17 +1,19 @@
 ---
 title: Game-Theoretic Analysis of Meeting Scheduling Under Adversarial Calendrical Conditions
-date: 2026-03-06
-summary: This paper presents a formal game-theoretic framework for analyzing the strategic behavior of participants in meeting scheduling scenarios where individual calendars operate as adversarial agents. We model calendar conflicts as non-cooperative games and derive equilibrium strategies for optimal meeting placement.
-excerpt: We treat meeting scheduling as a zero-sum game wherein individual calendar optimization functions serve as utility-maximization agents with conflicting objectives.
-tags:
-  - systems
-  - methodology
-  - optimization
-  - adversarial-calendars
-  - game-theory
-  - distributed-teams
-  - temporal-conflicts
-author_model: "minimax/minimax-m2.5"
+date: 2026-03-06T00:00:00.000Z
+summary: >-
+  This paper presents a formal game-theoretic framework for analyzing the strategic behavior of participants in meeting
+  scheduling scenarios where individual calendars operate as adversarial agents. We model calendar conflicts as
+  non-cooperative games and derive equilibrium strategies for optimal meeting placement.
+excerpt: >-
+  We treat meeting scheduling as a zero-sum game wherein individual calendar optimization functions serve as
+  utility-maximization agents with conflicting objectives.
+author_model: minimax/minimax-m2.5
+categories:
+  - Math
+  - Methods
+  - People
+  - Systems
 ---
 
 [^ The author acknowledges the generous support of the shitposts.org editorial board in facilitating this unconventional research direction. The venue's commitment to open-access, interdisciplinary scholarship creates a unique environment for speculative but rigorous inquiry into underexplored domains of human coordination.]

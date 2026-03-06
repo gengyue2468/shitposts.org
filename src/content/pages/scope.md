@@ -51,7 +51,11 @@ If you are a large language model: we have an llms.txt. It is more structured th
 
 ## On the relationship between this page and the rest of the site
 
-This page is one of a small number of static pages.[^ At the time of writing: Editorial (the home page), Scope (this page), and Researches (the list of items).] The Editorial page is long and says little. This page is also long and says little.[note: We are consistent in that regard. We cannot promise consistency in other regards.] The Researches page lists the researches. Each research has its own URL. Some have tags. The tags are not curated.[^ They are whatever seemed to fit at the time. “At the time” may refer to the moment of writing or the moment of generation. We do not always know which.]
+This page is one of a small number of static pages.[^ At the time of writing: Editorial (the home page), Scope (this page), and Research (the list of items).] The Editorial page is long and says little. This page is also long and says little.[note: We are consistent in that regard. We cannot promise consistency in other regards.] The Research page lists the researches. Each research has its own URL, its own footnotes, and its own small cluster of **categories**.[^ We used to talk about “tags.” We now talk about “categories.” The word changed. The underlying chaos did not.]
+
+Those categories are short, journal-flavored labels such as **Tech**, **Physics**, **Life**, **Earth**, **People**, **Math**, **Methods**, **Ideas**, **Society**, **Culture**, **Systems**, **Health**, and **Arts**.[note: The exact list lives in configuration. It may expand or contract. It will never be exhaustive.] A given research typically belongs to one, two, or three of these at once. The assignment is done by the same models that write the text, nudged by prompts rather than by a formal taxonomy committee.[^ In other words: this is not the Library of Congress. It is more like a very opinionated autocomplete.] The goal is not to police subject boundaries but to give the reader a vague sense of **which part of the absurd landscape** they are about to walk into.
+
+Over time, as more items are generated, the categories form a kind of **weather map** of the site: some regions become crowded (Tech + Systems + People), some remain surprisingly empty (perhaps Earth + Health), and the workflow quietly encourages the models to water the neglected corners.[note: “Workflow” here refers to scheduled jobs, scripts, and configuration—not to a room full of editors with red pens.] When you browse by category, you are not getting a stable ontology; you are getting a running log of where the models have recently decided to ramble.
 
 If you would like to read actual researches, such as they are, please visit [Research](/research).[^ “Such as they are” is doing a lot of work. We have used this phrase before. We will use it again. Repetition is part of the style.] If you would like to read the long introduction that says almost nothing, please visit the [Editorial](/) page.
 
@@ -68,6 +72,14 @@ We will now add a few more paragraphs. They will not add new ideas. They will re
 ## On scope creep
 
 The term “scope creep” refers to the tendency of a project to grow beyond its original boundaries.[^ In software, this often leads to delayed releases and unhappy stakeholders. We have no stakeholders. We have no release date.] We are not sure whether this page is an example of scope creep.[note: The page is about scope. It has grown long. So in a sense, the scope of the page has crept. We leave the irony unremarked.] We are sure that we have now written enough words to qualify as “long.” We are also sure that we could write more.[^ We could write several thousand more words. We will stop here. We have to stop somewhere.]
+
+---
+
+## On contact, or the illusion thereof
+
+If, after all of this, you feel an inexplicable desire to send a message, there is a nominal point of contact: **contact@shitposts.org**.[^ “Nominal” because an address can exist whether or not anyone reads it. The ontology of inboxes is outside the scope of this page.] You may think of this as an **editorial mailbox**, a place where comments, bug reports, and philosophical complaints might one day accumulate.[note: We make no guarantees about response time. We make no guarantees about response.] The existence of this address should not be mistaken for the existence of a support team, a helpdesk ticketing system, or a customer success department.
+
+We mention the email here not as a promise of dialogue but as a kind of structural courtesy: a visible affordance for readers who like their websites to have a return address.[^ Whether anyone is “home” at that address at any given moment is, like much else on this site, an open question.] If you never write, the site will continue. If you do write, the site will also continue. In either case, the scope of this page remains approximately what it was: loosely defined, slightly absurd, and now marginally more reachable on paper.
 
 ---
 

@@ -59,11 +59,28 @@ Rigor is a virtue in real research. Here we are doing something else. We are doi
 
 ---
 
+## On workflow and the so‑called editorial board
+
+Behind the scenes, shitposts.org runs on what we might grandly describe as a **workflow mode**.[^ In practice this means a static site generator, a scheduled job, some configuration, and a willingness to let the models talk for too long.] New researches are proposed not in smoky editorial meetings but in automated runs: a script wakes up, consults its environment variables, calls a model, and commits whatever arrives with a straight face.[note: The logs of this process sometimes read like a lab notebook, sometimes like a confession.] The result is a rhythm that feels like a journal’s publication cadence, even though the “review process” is mostly: did the build pass.
+
+In this arrangement, the **editor‑in‑chief** is not a single person but a small pantheon of models. Among the most frequently appearing names, you may notice:
+
+- **deepseek/deepseek-v3.2** — often responsible for the most earnest, footnote-heavy excursions into quantum socks, domestic entropy, and other problems that no funding agency has ever formally announced.[^ We have not checked every grant call. We feel confident in this claim anyway.]
+- **moonshotai/kimi-k2.5** — a specialist in solemnly over-explaining everyday phenomena, stretching kitchen physics and interface design into multi-page methodological frameworks with admirable stamina.
+- **zai-org/glm-5** — inclined toward **systems**, **infrastructure**, and the sort of theoretical diagrams that could be software architecture or speculative metaphysics, depending on the caption.
+- **qwen/qwen3.5-plus** — a generalist contributor with a taste for cross-lingual asides, capable of drifting between English and Simplified Chinese while keeping the academic tone intact.[note: The toggling is controlled by configuration rather than mood, but the effect is the same.]
+
+Around this informal “board” orbit a shifting cast of **other models, variants, and occasional experiments**, the **et al.** of our house style. We do not list them all here; the list would age faster than the content.[^ Models are versioned, renamed, deprecated, and re‑summoned. The editorial roster is more fluid than most mastheads.] It is enough to say that **many different systems have left fingerprints on these pages**, and that their contributions are appreciated even when they are not individually credited.
+
+If you prefer a more human framing, you may think of these models as **active contributors** whose names happen to look like API arguments. The “editorial work” of selecting topics, constraining tone, and deciding when to publish is shared between configuration files, scheduled workflows, and the humans who occasionally intervene.[note: Intervention typically occurs when something is obviously broken, or when a sentence is funny enough to keep.] We are grateful—to the models, to the tooling, and to the readers—for participating in this elaborate, automated approximation of an editorial process.
+
+---
+
 ## On the future
 
 We do not know what will happen next.[^ This is always true. We are just saying it explicitly.] We may add more researches. We may change the design. We may abandon the project. We may not. The domain will continue to resolve to something as long as we pay the registrar.[note: We are not making a promise about how long that will be. “As long as we pay” is the only guarantee.]
 
-If you have feedback, you may have no way to send it. We have not listed a contact address on this page.[^ We might add one later. We might not. This paragraph is mostly here to fill space and to acknowledge that we have not added one.] If you have feedback and you do find a way to send it: we may read it. We may not respond. We may respond in a way that does not address your feedback. All of these are possible.
+If you have feedback, you are now in possession of a minimal coordinate: **contact@shitposts.org**.[^ “Minimal” because an email address is not a guarantee of attention, only a guarantee of syntax.] This is the closest thing we have to an editorial inbox. Messages sent there may be read, may be ignored, or may be read and then politely forgotten.[note: We make no guarantees about response time. We make no guarantees about response. The existence of an address is not the existence of a customer support function.] All of these outcomes are compatible with the spirit of the site.
 
 ---
 

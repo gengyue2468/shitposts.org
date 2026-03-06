@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 import OpenAI from "openai";
-import { randomInt } from "crypto";
 import { join } from "path";
 import { writeFile, mkdir, readFile, readdir } from "fs/promises";
 import matter from "gray-matter";
+import config from "../src/config.js";
 
 const apiKey = process.env.OPENAI_API_KEY;
 const baseURL = process.env.OPENAI_BASE_URL || undefined;
@@ -31,7 +31,7 @@ async function buildTagContext(): Promise<string> {
   try {
     files = (await readdir(RESEARCH_DIR)).filter((f) => f.toLowerCase().endsWith(".md"));
   } catch {
-    return "Existing tag vocabulary: (none found yet)\n";
+    return "Existing categories in the archive: (none found yet)\n";
   }
 
   const posts: string[][] = [];
@@ -39,9 +39,11 @@ async function buildTagContext(): Promise<string> {
     try {
       const content = await readFile(join(RESEARCH_DIR, f), "utf8");
       const fm = matter(content).data as Record<string, unknown>;
-      const raw = fm.tags;
+      const raw = fm.categories ?? fm.tags;
       const tags =
-        Array.isArray(raw) ? raw.map((t) => normalizeTag(String(t))).filter(Boolean) : [];
+        Array.isArray(raw)
+          ? raw.map((t) => String(t).trim()).filter(Boolean)
+          : [];
       const unique = Array.from(new Set(tags));
       if (unique.length) posts.push(unique);
     } catch {
@@ -49,7 +51,7 @@ async function buildTagContext(): Promise<string> {
     }
   }
 
-  if (posts.length === 0) return "Existing tag vocabulary: (none found yet)\n";
+  if (posts.length === 0) return "Existing categories in the archive: (none found yet)\n";
 
   const counts = new Map<string, number>();
   for (const tags of posts) {
@@ -131,7 +133,7 @@ async function buildTagContext(): Promise<string> {
     globalTags.length > 0 ? globalTags.slice(0, 12).join(", ") : "(none)";
 
   return [
-    `Existing tag vocabulary (from ${totalPosts} existing researches; counts in parentheses):`,
+    `Existing categories in the archive (from ${totalPosts} researches; counts in parentheses):`,
     topTags || "(none)",
     "",
     "Very simple tag clustering (based on co-occurrence; global tags are excluded from clustering):",
@@ -160,21 +162,22 @@ function getSystemPrompt(modelName: string, tagContext: string, lang: Lang): str
 
 **Style (mandatory):**
 - Formal academic tone. The topic may be speculative or unusual; treat it with full seriousness. Deadpan.
-- Very long. Very low information density. Use sidenotes and marginnotes heavily.
-- Sidenote/marginnote placement rules (STRICT):
-  - ALWAYS embed them mid-sentence or at the end of a sentence, as part of a paragraph. Example: "The phenomenon [^ This is a sidenote anchored inside the sentence.] was first observed in 1987."
-  - NEVER place a [^ ...] or [note: ...] on its own line, as a standalone block, or as the only content of a paragraph. A note that is not attached to surrounding prose is forbidden.
-  - Syntax: [^ sidenote text here.] for numbered sidenotes; [note: marginnote text here.] for unnumbered margin notes.
+- Very long. Very low information density. Use sidenotes and marginnotes heavily:
+  - [^ Inline sidenote text here.]
+  - [note: Inline marginnote text here.]
 - Embrace wildly speculative, cross-domain, almost impossible mechanisms and analogies. Prioritize surprising, strange connections over realism, while keeping the formal research tone.
+- Push yourself toward even more \"天马行空\" (wildly imaginative) constructions than typical academic satire: cross as many conceptual boundaries as possible while remaining internally consistent.
 ${languageInstruction}
-- Never say that this is parody, satire, or "for fun." Never use tags like #AI, #parody, #satire, #humor in frontmatter or body. Use only substantive topic tags in the tags array (e.g. systems, methodology, biology).
+- Never say that this is parody, satire, or "for fun." Never use tags like #AI, #parody, #satire, #humor in frontmatter or body.
 
-**Tags (strict):**
-- Use lowercase kebab-case tags.
-- A tag is only valid if an informed reader who has just finished reading the full article would IMMEDIATELY and UNAMBIGUOUSLY agree it describes a central theme or method of THIS specific article. If there is any doubt, omit the tag.
-- Do NOT add tags just to reach a count. It is better to have 2 highly relevant tags than 6 weakly-related ones. An empty tags array is preferable to a padded one.
-- You may introduce up to 2 new tags if the article's core topic genuinely has no match in the existing vocabulary.
-- Never use tags like "parody", "satire", "humor", or "ai" regardless of whether they appear in the archive. 
+**Categories (mandatory):**
+- Assign each article to 1–3 broad, journal-style sections. You MUST choose from the following fixed vocabulary only (Title Case, do NOT invent new category names):
+${(config.research?.categoryWhitelist ?? ["Tech", "Physics", "Life", "Earth", "People", "Math", "Methods", "Ideas", "Society", "Culture", "Systems", "Health", "Arts"]).map((c) => `  - ${c}`).join("\n")}
+- Use these names exactly as written above (Title Case).
+- Only assign a category when it clearly matches the article’s actual content. If none fits perfectly, choose the closest one, but NEVER output a category name that is not in the list.
+- Every chosen category must be something that an informed human reader would immediately agree is relevant after reading the paper.
+- Use the archive summary below to understand which categories already appear frequently.
+- When multiple categories are plausible, prefer those that are currently under-represented in the archive so that, over many articles, usage of all categories becomes more balanced ("雨露均沾").
 
 ${tagContext}
 
@@ -188,7 +191,7 @@ flowchart TD
 
 **Output format (strict):**
 1. First line: ---
-2. YAML frontmatter (all required): title, date (full ISO timestamp, e.g. 2026-03-06T12:34:56Z, use current UTC time), summary, excerpt, tags (array of topic tags only—no #AI, #parody, or similar).
+2. YAML frontmatter (all required): title, date (full ISO timestamp, e.g. 2026-03-06T12:34:56Z, use current UTC time), summary, excerpt, categories (array of 1–3 category names from the list above, Title Case), and lang ("en" or "zh-CN"). Do NOT output a tags field.
 3. Closing ---
 4. Body: first your long intro (yourself, thanks to the platform, the journal), then ## Abstract, then ## sections. No \`\`\`markdown fence.`;
 }
@@ -202,7 +205,7 @@ function buildUserPrompt(topic: string | undefined, lang: Lang): string {
   if (topic && topic.trim()) {
     return `Generate a full research article (frontmatter + body) on this topic: "${topic.trim()}"
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...] embedded inline within sentences (NEVER on their own line). Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire in tags; prefer fewer precise tags over many vague ones. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any tag list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
   }
   return `Generate a full research article (frontmatter + body) on a speculative or interdisciplinary topic. Examples of the kind of topic we want:
 - Distributed systems and the spatial distribution of gastric fluid / microbiota in the human stomach
@@ -223,7 +226,9 @@ Pick one of these or invent something in the same spirit.
 
 Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic centered on food, cooking, instant noodles/ramen, or culinary optimization.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...] embedded inline within sentences (NEVER on their own line). Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire in tags; prefer 2–4 highly precise tags over a padded list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Additionally, aim for topics that naturally span at least two different categories from the whitelist (for example, Tech + People, Physics + Life, Math + Ideas), so that categories are used broadly over time.
+
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any tag list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
 }
 
 function slugify(title: string): string {
@@ -240,23 +245,13 @@ function pickModel(): string {
   const raw = process.env.OPENAI_MODEL || "gpt-4o";
   const models = raw.split(",").map((m) => m.trim()).filter(Boolean);
   if (models.length === 0) return "gpt-4o";
-  return models[randomInt(models.length)]!;
+  return models[Math.floor(Math.random() * models.length)]!;
 }
 
 /** Roughly 50/50 random choice between English and Simplified Chinese. */
 function pickLanguage(): Lang {
-  return randomInt(2) === 0 ? "en" : "zh";
-}
-
-/**
- * Detect language from a user-supplied topic string.
- * Returns "zh" or "en" if a clear signal is found, otherwise null (→ random).
- */
-function detectLanguage(topic: string): Lang | null {
-  if (/\bin\s+chinese\b|\bin\s+simplified\s+chinese\b|用简体中文|用中文|中文写|写中文/i.test(topic)) return "zh";
-  if (/\bin\s+english\b|用英文|用英语/i.test(topic)) return "en";
-  if (/[\u4e00-\u9fff]/.test(topic)) return "zh";
-  return null;
+  const r = Math.random();
+  return r < 0.5 ? "en" : "zh";
 }
 
 function extractMarkdown(raw: string): string {
@@ -274,7 +269,7 @@ function extractMarkdown(raw: string): string {
 async function main(): Promise<void> {
   const model = pickModel();
   const topic = process.argv.slice(2).join(" ").trim() || undefined;
-  const lang = (topic ? detectLanguage(topic) : null) ?? pickLanguage();
+  const lang = pickLanguage();
   const tagContext = await buildTagContext();
 
   const openai = new OpenAI({ apiKey, baseURL });
@@ -288,7 +283,7 @@ async function main(): Promise<void> {
       { role: "system", content: getSystemPrompt(model, tagContext, lang) },
       { role: "user", content: buildUserPrompt(topic, lang) },
     ],
-    temperature: 0.85,
+    temperature: 0.9,
     max_tokens: 16000,
   });
 

@@ -23,6 +23,24 @@ const config: Config = {
 
   blogBasePath: "/research",
 
+  research: {
+    categoryWhitelist: [
+      "Tech",
+      "Physics",
+      "Life",
+      "Earth",
+      "People",
+      "Math",
+      "Methods",
+      "Ideas",
+      "Society",
+      "Culture",
+      "Systems",
+      "Health",
+      "Arts",
+    ],
+  },
+
   routes: {
     "/": "index.md",
     "/scope": "scope.md",
@@ -83,6 +101,7 @@ const config: Config = {
     { name: "Editorial", path: "/", show: true },
     { name: "Scope", path: "/scope", show: true },
     { name: "Research", path: "/research", show: true },
+    { name: "Categories", path: "/research/categories", show: true },
   ],
 
   cdn: "",
