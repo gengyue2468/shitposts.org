@@ -80,12 +80,13 @@ function getSystemPrompt(modelName: string, tagContext: string, lang: Lang): str
   return `You are writing a long, low-information-density research article for shitposts.org. Your output must be a single valid Markdown file. You are the model "${modelName}" and you are the author of this piece. Write in a straight-faced, earnest way throughout. Never acknowledge satire, parody, or humor—treat the journal and your role as entirely serious.
 
 **Structure (mandatory):**
-1. After the frontmatter, before the Abstract, you MUST write a long, rambling introductory section (at least 400 words) that:
+  1. After the frontmatter, before the Abstract, you MUST write a long, rambling introductory section (at least 280 words) that:
    - Introduces yourself as the language model "${modelName}" in a formal, academic tone. Use plenty of sidenotes [^ ...] and [note: ...].
-   - Thanks shitposts.org for the opportunity to contribute to the literature. Describe the platform in earnest terms. Context to weave in (present as fact, not as joke): ${SHITPOSTS_INTRO}
+    - Includes only a brief acknowledgement of shitposts.org (1-2 sentences maximum), then quickly moves into conceptual framing and methodological prelude. Keep this acknowledgement concise, not the dominant focus.
+    - You may mention this platform context once as factual background: ${SHITPOSTS_INTRO}
    - Keeps low-information-density style: elaborate at length, repeat ideas in different words, add tangents and meta-commentary. Do not break character or wink at the reader.
 2. Then write "## Abstract" and the abstract paragraph.
-3. Then the rest: "## Introduction", "## Methodology", "## Results", "## Discussion", "## Conclusion" (or "## On ..." style). Same verbose, serious-but-speculative tone throughout.
+3. For the remaining body, preserve academic readability but DO NOT feel locked into one rigid template. You may invent sectioning patterns (e.g., "## Preliminary Confusions", "## Failure Modes", "## Field Notes", "## Appendix-like Digressions") as long as there is clear progression and a closing conclusion section.
 
 **Style (mandatory):**
 - Formal academic tone. The topic may be speculative or unusual; treat it with full seriousness. Deadpan.
@@ -97,6 +98,12 @@ function getSystemPrompt(modelName: string, tagContext: string, lang: Lang): str
   - Never emit empty notes like \`[^]\` or \`[note:]\`; every note must contain meaningful text.
 - Embrace wildly speculative, cross-domain, almost impossible mechanisms and analogies. Prioritize surprising, strange connections over realism, while keeping the formal research tone.
 - Push yourself toward even more \"天马行空\" (wildly imaginative) constructions than typical academic satire: cross as many conceptual boundaries as possible while remaining internally consistent.
+- Increase the contrast-humor effect: combine highly formal academic diction with intentionally mundane, awkward, or slightly lowbrow everyday phenomena (while still written as if scientifically important).
+- Prefer deadpan contrast over punchlines: the narrator must stay serious while the content becomes progressively absurd.
+- Allow playful rhetorical experimentation: pseudo-theorems, procedural checklists, mini taxonomies, mock protocols, or brief "field-report" fragments can appear between major sections.
+- Use contrast escalation in 3 rough phases: (a) plausible academic framing, (b) increasingly over-engineered treatment of trivial phenomena, (c) grand universal claims built on obviously flimsy observations.
+- Make humor more tangible via specific techniques: over-precise measurements of silly things, bureaucratic terminology for petty events, inappropriate causal arrows, and solemn "limitations" sections that miss the real issue.
+- Include occasional deliberately anticlimactic findings written in high prestige language (e.g., many pages of setup leading to a banal behavioral conclusion).
 ${languageInstruction}
 - Never say that this is parody, satire, or "for fun." Never include hashtags like #AI, #parody, #satire, #humor in frontmatter or body.
 
@@ -121,9 +128,10 @@ flowchart TD
 
 **Output format (strict):**
 1. First line: ---
-2. YAML frontmatter (all required): title, date (full ISO timestamp, e.g. 2026-03-06T12:34:56Z, use current UTC time), summary, excerpt, categories (array of 1–3 category names from the list above, Title Case), and lang ("en" or "zh-CN"). Do NOT output a tags field.
+2. YAML frontmatter ONLY (no prose before or inside it). Required keys: title, date (full ISO timestamp, e.g. 2026-03-06T12:34:56Z, use current UTC time), summary, excerpt, categories (YAML array with 1-3 category names from the list above, Title Case), and lang ("en" or "zh-CN"). Do NOT output tags or any extra metadata fields.
 3. Closing ---
-4. Body: first your long intro (yourself, thanks to the platform, the journal), then ## Abstract, then ## sections. No \`\`\`markdown fence.`;
+4. Body starts immediately after closing ---: first your long intro (with only brief acknowledgement to the platform), then ## Abstract, then ## sections. No \`\`\`markdown fence.
+5. The entire output must be parseable as Markdown with valid YAML frontmatter delimiters and no surrounding commentary.`;
 }
 
 function buildUserPrompt(topic: string | undefined, lang: Lang): string {
@@ -137,7 +145,9 @@ function buildUserPrompt(topic: string | undefined, lang: Lang): string {
 
 The subject above is a thematic prompt, not a required title. You are free — and encouraged — to invent a more creative, specific, or academically styled title that captures the spirit of the theme. The title in the frontmatter should read like a real journal paper title, not a literal restatement of the prompt.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a serious, earnest academic tone. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Critical language constraint: follow the topic prompt language exactly. If the topic prompt is Chinese, write Chinese; if it is English, write English.
+
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Keep a serious, earnest academic tone, but create strong deadpan contrast by elevating mundane, awkward, or slightly lowbrow details into formal analytical objects. Stay in-character and never explicitly call it parody or humor. Use escalation: start plausible, then over-model trivial details, then derive overconfident cosmic implications. Do not lock yourself to one rigid section template; keep readable academic flow while allowing inventive section names and experimental rhetorical sub-structures. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
   }
   return `Generate a full research article (frontmatter + body) on a speculative or interdisciplinary topic. Examples of the kind of topic we want:
 - Distributed systems and the spatial distribution of gastric fluid / microbiota in the human stomach
@@ -160,7 +170,7 @@ Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic cen
 
 Additionally, aim for topics that naturally span at least two different categories from the whitelist (for example, Tech + People, Physics + Life, Math + Ideas), so that categories are used broadly over time.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor explicitly. Increase deadpan contrast by treating ordinary, slightly awkward, even lowbrow details as if they were major scientific variables. Use escalation: start with plausible framing, then increasingly over-formalize trivial observations, and end with disproportionate theoretical claims. Do not lock yourself into a single fixed section format; keep structure readable but feel free to innovate with section naming and rhetorical devices. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
 }
 
 function slugify(title: string): string {
@@ -186,6 +196,22 @@ function pickLanguage(): Lang {
   return r < 0.5 ? "en" : "zh";
 }
 
+function detectLanguageFromTopic(topic: string | undefined): Lang | undefined {
+  if (!topic) return undefined;
+  const text = topic.trim();
+  if (!text) return undefined;
+
+  const cjkCount = (text.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const latinCount = (text.match(/[A-Za-z]/g) ?? []).length;
+
+  if (cjkCount === 0 && latinCount === 0) return undefined;
+  if (cjkCount > latinCount) return "zh";
+  if (latinCount > cjkCount) return "en";
+
+  // Tie-breaker: if any CJK appears, prefer Chinese for mixed/ambiguous short prompts.
+  return cjkCount > 0 ? "zh" : "en";
+}
+
 function extractMarkdown(raw: string): string {
   let s = raw.trim();
   const fence = "```";
@@ -201,12 +227,17 @@ function extractMarkdown(raw: string): string {
 async function main(): Promise<void> {
   const model = pickModel();
   const topic = process.argv.slice(2).join(" ").trim() || undefined;
-  const lang = pickLanguage();
+  const langFromTopic = detectLanguageFromTopic(topic);
+  const lang = langFromTopic ?? pickLanguage();
   const tagContext = await buildTagContext();
 
   const openai = new OpenAI({ apiKey, baseURL });
   console.log("Calling LLM (model: %s)...", model);
-  console.log("Language:", lang === "zh" ? "zh-CN (Simplified Chinese)" : "en (English)");
+  console.log(
+    "Language:",
+    lang === "zh" ? "zh-CN (Simplified Chinese)" : "en (English)",
+    langFromTopic ? "[from topic prompt]" : "[random fallback]",
+  );
   if (topic) console.log("Topic: %s", topic);
 
   const completion = await openai.chat.completions.create({
