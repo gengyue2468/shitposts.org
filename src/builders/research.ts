@@ -242,6 +242,31 @@ function formatTimeOnly(dateString: string | undefined): string {
   return `at ${time} UTC`;
 }
 
+function formatDateOnly(dateString: string | undefined): string {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const year = d.getUTCFullYear();
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const month = monthNames[d.getUTCMonth()]!;
+  const day = d.getUTCDate();
+  return `${month} ${day}, ${year}`;
+}
+
 function formatFullDateTime(dateString: string | undefined): string {
   if (!dateString) return "";
   const d = new Date(dateString);
@@ -317,6 +342,94 @@ function generatePostsListHTML(posts: Post[]): string {
   return parts.join("");
 }
 
+function generateResearchPostsListHTML(posts: Post[]): string {
+  if (posts.length === 0) return "<p>No research found.</p>";
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const grouped = new Map<string, Map<number, Post[]>>();
+  const unknownPosts: Post[] = [];
+
+  for (const post of posts) {
+    if (!post.date) {
+      unknownPosts.push(post);
+      continue;
+    }
+
+    const d = new Date(post.date);
+    if (Number.isNaN(d.getTime())) {
+      unknownPosts.push(post);
+      continue;
+    }
+
+    const year = String(d.getUTCFullYear());
+    const month = d.getUTCMonth();
+
+    const byMonth = grouped.get(year) ?? new Map<number, Post[]>();
+    if (!grouped.has(year)) grouped.set(year, byMonth);
+    const monthPosts = byMonth.get(month) ?? [];
+    monthPosts.push(post);
+    byMonth.set(month, monthPosts);
+  }
+
+  const yearKeys = Array.from(grouped.keys()).sort((a, b) => Number(b) - Number(a));
+  const parts: string[] = [];
+
+  for (const year of yearKeys) {
+    parts.push(`<h2>${year}</h2>`);
+    const byMonth = grouped.get(year)!;
+    const monthKeys = Array.from(byMonth.keys()).sort((a, b) => b - a);
+
+    for (const month of monthKeys) {
+      parts.push(`<h3>${monthNames[month]}</h3>`);
+      parts.push('<ul class="posts-list">');
+
+      const monthPosts = byMonth.get(month)!;
+      for (const post of monthPosts) {
+        const datePart = formatDateOnly(post.date);
+        const timePart = formatTimeOnly(post.date);
+        const stamp = datePart && timePart
+          ? `${datePart} ${timePart}`
+          : (datePart || timePart);
+
+        parts.push('<li class="post-item">');
+        parts.push(`<a href="${researchBasePath}/${post.slug}">${post.title}</a>`);
+        if (stamp) parts.push(` <span class="post-date-inline">${stamp}</span>`);
+        parts.push("</li>");
+      }
+
+      parts.push("</ul>");
+    }
+  }
+
+  if (unknownPosts.length > 0) {
+    parts.push("<h2>Unknown Year</h2>");
+    parts.push("<h3>Unknown Month</h3>");
+    parts.push('<ul class="posts-list">');
+    for (const post of unknownPosts) {
+      parts.push('<li class="post-item">');
+      parts.push(`<a href="${researchBasePath}/${post.slug}">${post.title}</a>`);
+      parts.push("</li>");
+    }
+    parts.push("</ul>");
+  }
+
+  return parts.join("");
+}
+
 export async function buildResearchIndex(
   baseLayout: string,
   researchIndexLayout: string,
@@ -362,7 +475,7 @@ export async function buildResearchIndex(
     if (post.tags && Array.isArray(post.tags)) allTags.push(...post.tags);
   }
   const tagsHtml = generateTagsHTML(allTags);
-  const postsListHtml = posts.length > 0 ? generatePostsListHTML(posts) : "<p>No research yet.</p>";
+  const postsListHtml = posts.length > 0 ? generateResearchPostsListHTML(posts) : "<p>No research yet.</p>";
   const tagsSection = `<div style="margin-top: 3rem;">${tagsHtml}</div>`;
   const contentData = { title: "Research", postsList: postsListHtml + tagsSection };
   const renderedContent = renderTemplate(researchIndexLayout, contentData);
