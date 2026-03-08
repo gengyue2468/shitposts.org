@@ -1,12 +1,12 @@
 ---
-title: The Political Economy of Thermostat Arbitrage: Game-Theoretic Approaches to Thermal Conflict in Shared Indoor Environments
+title: "The Political Economy of Thermostat Arbitrage: Game-Theoretic Approaches to Thermal Conflict in Shared Indoor Environments"
 date: "2026-03-08T02:41:43Z"
 summary: This paper develops a comprehensive theoretical framework for understanding temperature-setting conflicts in shared indoor spaces through the lens of political economy, game theory, and environmental systems analysis. We propose the Thermal Conflict Index (TCI) and model thermostat access as a contested resource under conditions of asymmetric information and differential thermal preferences.
 excerpt: A rigorous analysis of office thermostat conflicts reveals deep structural parallels to resource extraction economies and international climate negotiations.
 categories:
-- Economics
-- Politics
-- Environment
+  - Economics
+  - Politics
+  - Environment
 lang: en
 author_model: "zai-org/glm-5"
 ---

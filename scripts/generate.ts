@@ -20,6 +20,15 @@ const SHITPOSTS_INTRO = `shitposts.org is an open-access, interdisciplinary rese
 
 type Lang = "en" | "zh";
 
+type NormalizedFrontmatter = {
+  title: string;
+  date: string;
+  summary: string;
+  excerpt: string;
+  categories: string[];
+  lang: "en" | "zh-CN";
+};
+
 async function buildTagContext(): Promise<string> {
   const whitelist: string[] = config.research?.categoryWhitelist ?? [
     "Tech", "Physics", "Life", "Earth", "Space", "Chemistry", "Engineering",
@@ -128,7 +137,7 @@ flowchart TD
 
 **Output format (strict):**
 1. First line: ---
-2. YAML frontmatter ONLY (no prose before or inside it). Required keys: title, date (full ISO timestamp, e.g. 2026-03-06T12:34:56Z, use current UTC time), summary, excerpt, categories (YAML array with 1-3 category names from the list above, Title Case), and lang ("en" or "zh-CN"). Do NOT output tags or any extra metadata fields.
+2. YAML frontmatter ONLY (no prose before or inside it). Required keys: title, date (full ISO timestamp, e.g. 2026-03-06T12:34:56Z, use current UTC time), summary, excerpt, categories (YAML array with 1-3 category names from the list above, Title Case), and lang ("en" or "zh-CN"). Quote EVERY scalar string value in double quotes, including title, date, summary, excerpt, and lang, to avoid YAML parsing errors. Do NOT output tags or any extra metadata fields.
 3. Closing ---
 4. Body starts immediately after closing ---: first your long intro (with only brief acknowledgement to the platform), then ## Abstract, then ## sections. No \`\`\`markdown fence.
 5. The entire output must be parseable as Markdown with valid YAML frontmatter delimiters and no surrounding commentary.`;
@@ -147,7 +156,7 @@ The subject above is a thematic prompt, not a required title. You are free — a
 
 Critical language constraint: follow the topic prompt language exactly. If the topic prompt is Chinese, write Chinese; if it is English, write English.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Keep a serious, earnest academic tone, but create strong deadpan contrast by elevating mundane, awkward, or slightly lowbrow details into formal analytical objects. Stay in-character and never explicitly call it parody or humor. Use escalation: start plausible, then over-model trivial details, then derive overconfident cosmic implications. Do not lock yourself to one rigid section template; keep readable academic flow while allowing inventive section names and experimental rhetorical sub-structures. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Keep a serious, earnest academic tone, but create strong deadpan contrast by elevating mundane, awkward, or slightly lowbrow details into formal analytical objects. Stay in-character and never explicitly call it parody or humor. Use escalation: start plausible, then over-model trivial details, then derive overconfident cosmic implications. Do not lock yourself to one rigid section template; keep readable academic flow while allowing inventive section names and experimental rhetorical sub-structures. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). In YAML frontmatter, wrap every scalar string value in double quotes to avoid parse errors. Output only the raw Markdown file, no code fence.`;
   }
   return `Generate a full research article (frontmatter + body) on a speculative or interdisciplinary topic. Examples of the kind of topic we want:
 - Distributed systems and the spatial distribution of gastric fluid / microbiota in the human stomach
@@ -170,7 +179,7 @@ Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic cen
 
 Additionally, aim for topics that naturally span at least two different categories from the whitelist (for example, Tech + People, Physics + Life, Math + Ideas), so that categories are used broadly over time.
 
-Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor explicitly. Increase deadpan contrast by treating ordinary, slightly awkward, even lowbrow details as if they were major scientific variables. Use escalation: start with plausible framing, then increasingly over-formalize trivial observations, and end with disproportionate theoretical claims. Do not lock yourself into a single fixed section format; keep structure readable but feel free to innovate with section naming and rhetorical devices. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). Output only the raw Markdown file, no code fence.`;
+Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Write in a straight-faced, scholarly tone—never acknowledge parody or humor explicitly. Increase deadpan contrast by treating ordinary, slightly awkward, even lowbrow details as if they were major scientific variables. Use escalation: start with plausible framing, then increasingly over-formalize trivial observations, and end with disproportionate theoretical claims. Do not lock yourself into a single fixed section format; keep structure readable but feel free to innovate with section naming and rhetorical devices. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). In YAML frontmatter, wrap every scalar string value in double quotes to avoid parse errors. Output only the raw Markdown file, no code fence.`;
 }
 
 function slugify(title: string): string {
@@ -224,6 +233,62 @@ function extractMarkdown(raw: string): string {
   return s.trimEnd();
 }
 
+function escapeYamlDoubleQuoted(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/\t/g, "\\t")
+    .replace(/"/g, '\\"');
+}
+
+function normalizeFrontmatter(markdown: string, nowIso: string, model: string, lang: Lang): { markdown: string; slug: string } {
+  const langCode = lang === "zh" ? "zh-CN" : "en";
+  const parsed = matter(markdown);
+  const data = parsed.data as Record<string, unknown>;
+
+  const title = String(data.title ?? "Untitled").trim() || "Untitled";
+  const summary = String(data.summary ?? data.excerpt ?? "").trim();
+  const excerpt = String(data.excerpt ?? data.summary ?? "").trim();
+  const rawCategories = Array.isArray(data.categories)
+    ? data.categories
+    : Array.isArray(data.tags)
+      ? data.tags
+      : [];
+  const categories = rawCategories
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  const normalized: NormalizedFrontmatter = {
+    title,
+    date: nowIso,
+    summary,
+    excerpt,
+    categories,
+    lang: langCode,
+  };
+
+  const frontmatter = [
+    "---",
+    `title: "${escapeYamlDoubleQuoted(normalized.title)}"`,
+    `date: "${escapeYamlDoubleQuoted(normalized.date)}"`,
+    `summary: "${escapeYamlDoubleQuoted(normalized.summary)}"`,
+    `excerpt: "${escapeYamlDoubleQuoted(normalized.excerpt)}"`,
+    "categories:",
+    ...normalized.categories.map((category) => `  - "${escapeYamlDoubleQuoted(category)}"`),
+    `author_model: "${escapeYamlDoubleQuoted(model)}"`,
+    `lang: "${escapeYamlDoubleQuoted(normalized.lang)}"`,
+    "---",
+  ].join("\n");
+
+  const content = parsed.content.replace(/^\s+/, "");
+  return {
+    markdown: `${frontmatter}\n${content}`,
+    slug: slugify(normalized.title),
+  };
+}
+
 async function main(): Promise<void> {
   const model = pickModel();
   const topic = process.argv.slice(2).join(" ").trim() || undefined;
@@ -259,27 +324,9 @@ async function main(): Promise<void> {
   let markdown = extractMarkdown(raw);
 
   const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-  const fmMatch = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  let slug = "untitled";
-  if (fmMatch) {
-    let fmBlock = fmMatch[1];
-    const titleMatch = fmBlock.match(/title:\s*["']?([^"'\n]+)["']?/);
-    if (titleMatch) slug = slugify(titleMatch[1].trim());
-    // enforce precise timestamp in date
-    if (/^date:/m.test(fmBlock)) {
-      fmBlock = fmBlock.replace(/^date:.*$/m, `date: "${nowIso}"`);
-    } else {
-      fmBlock = `date: "${nowIso}"\n` + fmBlock;
-    }
-    if (!/author_model:/m.test(fmBlock)) {
-      fmBlock = `${fmBlock}\nauthor_model: "${model}"`;
-    }
-    const langCode = lang === "zh" ? "zh-CN" : "en";
-    if (!/^lang:/m.test(fmBlock)) {
-      fmBlock = `${fmBlock}\nlang: "${langCode}"`;
-    }
-    markdown = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---/, `---\n${fmBlock}\n---`);
-  }
+  const normalized = normalizeFrontmatter(markdown, nowIso, model, lang);
+  markdown = normalized.markdown;
+  const slug = normalized.slug;
 
   const filename = `${slug}.md`;
   const outPath = join(RESEARCH_DIR, filename);
