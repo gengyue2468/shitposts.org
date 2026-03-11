@@ -159,25 +159,6 @@ type NormalizedFrontmatter = {
   lang: "en" | "zh-CN";
 };
 
-type PremiseCandidate = {
-  title: string;
-  premise: string;
-  whyItIsFunny: string;
-  categories: string[];
-  novelty: number;
-  humor: number;
-  absurdity: number;
-  coherence: number;
-  overusedRisk: number;
-};
-
-type PremiseSelectionResult = {
-  candidates: PremiseCandidate[];
-  selected: PremiseCandidate;
-  selectedIndex: number;
-  score: number;
-};
-
 function pickOne<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
 }
@@ -195,10 +176,6 @@ function randomBetween(min: number, max: number, decimals = 2): number {
   const factor = 10 ** decimals;
   const value = min + Math.random() * (max - min);
   return Math.round(value * factor) / factor;
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function pickSamplingProfile(): SamplingProfile {
@@ -277,225 +254,6 @@ function buildHumorContext(lang: Lang): string {
     "- Keep the prose serious, but repeatedly make the reader notice that vast analytical prestige is being spent on an awkward, petty, or physically unimpressive phenomenon.",
     "- Use occasional malicious precision, over-official terminology, and solemn causal claims about behavior too minor to deserve them.",
   ].join("\n");
-}
-
-function buildPremiseSystemPrompt(lang: Lang, tagContext: string, creativityContext: string, humorContext: string, premiseCount: number): string {
-  const categoryList = (config.research?.categoryWhitelist ?? [
-    "Tech", "Physics", "Life", "Earth", "People", "Math", "Methods", "Ideas", "Society", "Culture", "Systems", "Health", "Arts",
-  ]).map((category) => `- ${category}`).join("\n");
-
-  if (lang === "zh") {
-    return `你现在只负责第一阶段：批量提出研究 premise，不要写正文，不要写 Markdown，不要写 frontmatter。
-
-你的任务是一次性提出 ${premiseCount} 个彼此显著不同的候选 premise，并以 JSON 返回。目标不是“合理”，而是“严肃地离谱、具体地好笑、跨域地天马行空”，同时仍然足够可展开成一篇完整论文。
-
-硬性要求：
-- 绝对不要回落到这些旧母题：${OVERUSED_DEFAULTS.join(", ")}。
-- premise 必须明显不同，不能只是换词重写。
-- 至少让一半候选把非常具体、很琐碎的物件或行为放进核心理论，而不是背景装饰。
-- 至少让一半候选带有制度、委员会、流程、合规、审计、规划、保险、伦理审查之类的组织性介入。
-- 至少让一半候选最终能导向某种荒唐但一本正经的宏大结论。
-- 每个候选必须能被一个正常编辑一眼看出“这玩意儿确实比普通 AI 荒诞论文更怪”。
-
-${creativityContext}
-
-${humorContext}
-
-类别白名单：
-${categoryList}
-
-档案类别分布参考：
-${tagContext}
-
-输出必须是合法 JSON 对象，结构严格如下：
-{
-  "candidates": [
-    {
-      "title": "string",
-      "premise": "string",
-      "whyItIsFunny": "string",
-      "categories": ["string", "string"],
-      "novelty": 1-10,
-      "humor": 1-10,
-      "absurdity": 1-10,
-      "coherence": 1-10,
-      "overusedRisk": 1-10
-    }
-  ]
-}
-
-不要输出解释，不要加代码块，不要加 markdown。`;
-  }
-
-  return `You are handling stage one only: generate research premises in bulk. Do not write the article body, do not write Markdown, and do not write frontmatter.
-
-Produce exactly ${premiseCount} substantially different candidate premises in one JSON response. The goal is not mere plausibility. The goal is to be seriously absurd, concretely funny, and wildly cross-domain while still supporting a full-length article.
-
-Hard requirements:
-- Do not fall back to these overused motifs: ${OVERUSED_DEFAULTS.join(", ")}.
-- The premises must be materially different from one another, not simple paraphrases.
-- At least half of the candidates must place a highly specific trivial object or petty repeated behavior at the center of the theory rather than in the background.
-- At least half of the candidates must involve institutional intervention: committees, compliance, planning, insurance, audit, ethics review, municipal procedure, or similar bureaucratic gravity.
-- At least half of the candidates must plausibly escalate toward an absurd grand conclusion stated with complete seriousness.
-- Every candidate should feel stranger and more sharply specified than a generic AI-generated fake-paper topic.
-
-${creativityContext}
-
-${humorContext}
-
-Allowed categories:
-${categoryList}
-
-Archive category distribution:
-${tagContext}
-
-Return valid JSON only with this exact shape:
-{
-  "candidates": [
-    {
-      "title": "string",
-      "premise": "string",
-      "whyItIsFunny": "string",
-      "categories": ["string", "string"],
-      "novelty": 1-10,
-      "humor": 1-10,
-      "absurdity": 1-10,
-      "coherence": 1-10,
-      "overusedRisk": 1-10
-    }
-  ]
-}
-
-Do not include explanations, code fences, or markdown.`;
-}
-
-function buildPremiseUserPrompt(topic: string | undefined, lang: Lang, premiseCount: number): string {
-  if (lang === "zh") {
-    if (topic && topic.trim()) {
-      return `围绕这个主题生成 ${premiseCount} 个候选 premise："${topic.trim()}"。
-
-不要直接照抄主题字面。把它扭成更具体、更偏门、更制度化、更物件化、更荒唐的研究命题。输出 JSON。`;
-    }
-
-    return `请自行发明 ${premiseCount} 个候选 premise。优先选择普通人绝不会主动提议写成论文、但又能被极度庄严的学术语言硬抬起来的对象。输出 JSON。`;
-  }
-
-  if (topic && topic.trim()) {
-    return `Generate ${premiseCount} candidate premises around this theme: "${topic.trim()}".
-
-Do not restate the theme literally. Mutate it into narrower, stranger, more procedural, more object-centered, and more institutionally overcommitted research claims. Output JSON.`;
-  }
-
-  return `Invent ${premiseCount} candidate premises from scratch. Prefer subjects that a normal person would never nominate for scholarship, but that can be elevated by aggressively serious academic framing. Output JSON.`;
-}
-
-function extractJsonObject(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("{")) return trimmed;
-
-  const first = trimmed.indexOf("{");
-  const last = trimmed.lastIndexOf("}");
-  if (first === -1 || last === -1 || last <= first) {
-    throw new Error("No JSON object found in premise-generation response.");
-  }
-
-  return trimmed.slice(first, last + 1);
-}
-
-function clampScore(value: unknown): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 5;
-  return Math.max(1, Math.min(10, Math.round(parsed)));
-}
-
-function normalizePremiseCandidate(candidate: unknown): PremiseCandidate | null {
-  if (!candidate || typeof candidate !== "object") return null;
-  const data = candidate as Record<string, unknown>;
-
-  const title = String(data.title ?? "").trim();
-  const premise = String(data.premise ?? "").trim();
-  const whyItIsFunny = String(data.whyItIsFunny ?? "").trim();
-  const categories = Array.isArray(data.categories)
-    ? data.categories.map((value) => String(value).trim()).filter(Boolean).slice(0, 3)
-    : [];
-
-  if (!title || !premise || !whyItIsFunny || categories.length === 0) {
-    return null;
-  }
-
-  return {
-    title,
-    premise,
-    whyItIsFunny,
-    categories,
-    novelty: clampScore(data.novelty),
-    humor: clampScore(data.humor),
-    absurdity: clampScore(data.absurdity),
-    coherence: clampScore(data.coherence),
-    overusedRisk: clampScore(data.overusedRisk),
-  };
-}
-
-function scorePremiseCandidate(candidate: PremiseCandidate): number {
-  return (
-    candidate.novelty * 1.35 +
-    candidate.humor * 1.25 +
-    candidate.absurdity * 1.4 +
-    candidate.coherence * 0.6 -
-    candidate.overusedRisk * 1.1
-  );
-}
-
-function selectPremiseCandidate(candidates: PremiseCandidate[]): PremiseSelectionResult {
-  if (candidates.length === 0) {
-    throw new Error("Premise-generation returned no usable candidates.");
-  }
-
-  let selectedIndex = 0;
-  let bestScore = scorePremiseCandidate(candidates[0]!);
-
-  for (let index = 1; index < candidates.length; index++) {
-    const candidate = candidates[index]!;
-    const score = scorePremiseCandidate(candidate);
-    if (score > bestScore) {
-      bestScore = score;
-      selectedIndex = index;
-    }
-  }
-
-  return {
-    candidates,
-    selected: candidates[selectedIndex]!,
-    selectedIndex,
-    score: bestScore,
-  };
-}
-
-async function generatePremiseCandidates(openai: OpenAI, model: string, lang: Lang, tagContext: string, creativityContext: string, humorContext: string, topic: string | undefined, premiseCount: number): Promise<PremiseSelectionResult> {
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: buildPremiseSystemPrompt(lang, tagContext, creativityContext, humorContext, premiseCount) },
-      { role: "user", content: buildPremiseUserPrompt(topic, lang, premiseCount) },
-    ],
-    temperature: 1.25,
-    top_p: 0.97,
-    presence_penalty: 0.85,
-    frequency_penalty: 0.15,
-    max_tokens: 4000,
-  });
-
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) {
-    throw new Error("No premise candidates returned from stage one.");
-  }
-
-  const parsed = JSON.parse(extractJsonObject(raw)) as { candidates?: unknown[] };
-  const candidates = Array.isArray(parsed.candidates)
-    ? parsed.candidates.map(normalizePremiseCandidate).filter((candidate): candidate is PremiseCandidate => candidate !== null)
-    : [];
-
-  return selectPremiseCandidate(candidates);
 }
 
 async function buildTagContext(): Promise<string> {
@@ -621,27 +379,12 @@ flowchart TD
 5. The entire output must be parseable as Markdown with valid YAML frontmatter delimiters and no surrounding commentary.`;
 }
 
-function buildUserPrompt(topic: string | undefined, lang: Lang, creativityContext: string, humorContext: string, selectedPremise: PremiseCandidate): string {
+function buildUserPrompt(topic: string | undefined, lang: Lang, creativityContext: string, humorContext: string): string {
   const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   const langLine =
     lang === "zh"
       ? "Write the entire article in Simplified Chinese (用简体中文完整撰写整篇文章，可以自然夹杂英文术语，但不要整段英文)。"
       : "Write the entire article in English.";
-  const selectedPremiseBlock = lang === "zh"
-    ? [
-      "你必须围绕下面这个已经选中的 premise 写全文，不要重新发明主题：",
-      `- Working title seed: ${selectedPremise.title}`,
-      `- Premise: ${selectedPremise.premise}`,
-      `- Comic engine: ${selectedPremise.whyItIsFunny}`,
-      `- Suggested categories: ${selectedPremise.categories.join(", ")}`,
-    ].join("\n")
-    : [
-      "You must write the full article around the selected premise below. Do not invent a new topic.",
-      `- Working title seed: ${selectedPremise.title}`,
-      `- Premise: ${selectedPremise.premise}`,
-      `- Comic engine: ${selectedPremise.whyItIsFunny}`,
-      `- Suggested categories: ${selectedPremise.categories.join(", ")}`,
-    ].join("\n");
 
   if (topic && topic.trim()) {
     return `Generate a full research article (frontmatter + body) whose subject matter originates from this user theme: "${topic.trim()}"
@@ -649,8 +392,6 @@ function buildUserPrompt(topic: string | undefined, lang: Lang, creativityContex
 The subject above is a thematic prompt, not a required title. You are free — and encouraged — to invent a more creative, specific, or academically styled title that captures the spirit of the theme. The title in the frontmatter should read like a real journal paper title, not a literal restatement of the prompt.
 
 Critical language constraint: follow the topic prompt language exactly. If the topic prompt is Chinese, write Chinese; if it is English, write English.
-
-${selectedPremiseBlock}
 
 Requirements: long (at least 1500 words of body), many sidenotes [^ ...] and marginnotes [note: ...]. Keep a serious, earnest academic tone, but create strong deadpan contrast by elevating mundane, awkward, or slightly lowbrow details into formal analytical objects. Stay in-character and never explicitly call it parody or humor. Use escalation: start plausible, then over-model trivial details, then derive overconfident cosmic implications. Do not lock yourself to one rigid section template; keep readable academic flow while allowing inventive section names and experimental rhetorical sub-structures. Make it funnier by being more disproportionate, more institutionally overcommitted, and more embarrassingly specific rather than by adding punchlines. ${langLine} Do not use #AI, #parody, or #satire anywhere in the file. Use only the \`categories\` field (1–3 items from the whitelist) in frontmatter, and do not output any additional label/keyword list. Use date: "${nowIso}" in frontmatter (full ISO timestamp). In YAML frontmatter, wrap every scalar string value in double quotes to avoid parse errors. Output only the raw Markdown file, no code fence.
 
@@ -676,8 +417,6 @@ ${humorContext}`;
 Pick one of these or invent something in the same spirit.
 
 Do not reuse the example topics verbatim. Treat them only as proof that the target can be much stranger, more concrete, and more imaginative than standard tech-satire defaults.
-
-${selectedPremiseBlock}
 
 Hard constraint: unless the user explicitly asks for it, DO NOT pick a topic centered on food, cooking, instant noodles/ramen, or culinary optimization.
 
@@ -800,7 +539,6 @@ function normalizeFrontmatter(markdown: string, nowIso: string, model: string, l
 async function main(): Promise<void> {
   const model = pickModel();
   const topic = process.argv.slice(2).join(" ").trim() || undefined;
-  const premiseCount = randomInt(12, 20);
   const langFromTopic = detectLanguageFromTopic(topic);
   const lang = langFromTopic ?? pickLanguage();
   const tagContext = await buildTagContext();
@@ -810,7 +548,6 @@ async function main(): Promise<void> {
 
   const openai = new OpenAI({ apiKey, baseURL });
   console.log("Calling LLM (model: %s)...", model);
-  console.log("Stage 1 premise count: %d", premiseCount);
   console.log(
     "Sampling profile:",
     samplingProfile.label,
@@ -823,30 +560,11 @@ async function main(): Promise<void> {
   );
   if (topic) console.log("Topic: %s", topic);
 
-  console.log("Stage 1: generating premise candidates...");
-  const premiseSelection = await generatePremiseCandidates(
-    openai,
-    model,
-    lang,
-    tagContext,
-    creativityContext,
-    humorContext,
-    topic,
-    premiseCount,
-  );
-  console.log(
-    "Stage 1 winner: #%d score=%.2f title=%s",
-    premiseSelection.selectedIndex + 1,
-    premiseSelection.score,
-    premiseSelection.selected.title,
-  );
-  console.log("Stage 1 premise: %s", premiseSelection.selected.premise);
-
   const completion = await openai.chat.completions.create({
     model,
     messages: [
       { role: "system", content: getSystemPrompt(model, tagContext, lang, creativityContext, humorContext) },
-      { role: "user", content: buildUserPrompt(topic, lang, creativityContext, humorContext, premiseSelection.selected) },
+      { role: "user", content: buildUserPrompt(topic, lang, creativityContext, humorContext) },
     ],
     temperature: samplingProfile.temperature,
     top_p: samplingProfile.topP,
