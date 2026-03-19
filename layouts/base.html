@@ -61,15 +61,27 @@
     <meta name="author" content="{{author}}" />
     <meta name="description" content="{{description}}" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#fffff8" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#151515" media="(prefers-color-scheme: dark)" />
+    <meta
+      name="theme-color"
+      content="#fffff8"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#151515"
+      media="(prefers-color-scheme: dark)"
+    />
     {{keywords}}
     <title>{{title}}</title>
     <link rel="canonical" href="{{canonicalUrl}}" />
-    <link rel="alternate" type="application/rss+xml" title="{{siteTitle}}" href="/rss.xml" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="{{siteTitle}}"
+      href="/rss.xml"
+    />
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
-    {{ogTags}}
-    {{jsonLd}}
+    {{ogTags}} {{jsonLd}}
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link
@@ -94,6 +106,11 @@
       crossorigin
     />
     {{css}}
+    <script
+      defer
+      src="https://umami.gengyue.site/script.js"
+      data-website-id="0441471c-47d5-4385-9afd-bddd4f6b7e34"
+    ></script>
   </head>
   <body>
     <nav>{{nav}}</nav>
@@ -114,12 +131,25 @@
     <script>
       window.MathJax = {
         tex: {
-          inlineMath: [["$", "$"], ["\\(", "\\)"]],
-          displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+          displayMath: [
+            ["$$", "$$"],
+            ["\\[", "\\]"],
+          ],
           processEscapes: true,
         },
         options: {
-          skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+          skipHtmlTags: [
+            "script",
+            "noscript",
+            "style",
+            "textarea",
+            "pre",
+            "code",
+          ],
         },
       };
     </script>
